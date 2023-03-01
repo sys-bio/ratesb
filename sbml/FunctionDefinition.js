@@ -7,7 +7,7 @@ class FunctionDefinition {
         for (var i = 0; i < this.sbmlFunctionDefinition.getNumArguments(); i++) {
             this.argumentNames.push(this.sbmlFunctionDefinition.getArgument(i).getName());
         }
-        this.body = libsbml.formulaToL3String(this.sbmlFunctionDefinition.getBody());
+        this.body = libsbml.formulaToL3String_1(this.sbmlFunctionDefinition.getBody());
         this.libsbml = libsbml;
     }
 
