@@ -1,5 +1,6 @@
 class FunctionDefinition {
     constructor( sbmlFunctionDefinition, libsbml) {
+        this.libsbml = libsbml;
         this.sbmlFunctionDefinition = sbmlFunctionDefinition;
         this.functionName = this.sbmlFunctionDefinition.getName();
         this.id = this.sbmlFunctionDefinition.getId();
@@ -7,8 +8,7 @@ class FunctionDefinition {
         for (var i = 0; i < this.sbmlFunctionDefinition.getNumArguments(); i++) {
             this.argumentNames.push(this.sbmlFunctionDefinition.getArgument(i).getName());
         }
-        this.body = libsbml.formulaToL3String_1(this.sbmlFunctionDefinition.getBody());
-        this.libsbml = libsbml;
+        this.body = new libsbml.SBMLFormulaParser().formulaToL3String(this.sbmlFunctionDefinition.getBody());
     }
 
     toString() {
