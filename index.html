@@ -14,8 +14,9 @@
   <!-- Importing js files -->
   <script src="sbml/libsbml.js" type="text/javascript"></script>
   <script src="sbml/libsbml.wasm" type="application/wasm"></script>
-  <script src="sbml/processSBML.js" type="text/javascript"></script>
+  <script src="sbml/ProcessSBML.js" type="text/javascript"></script>
   <script src="sbml/FunctionDefinition.js" type="text/javascript"></script>
+  <script src="sbml/Reaction.js" type="text/javascript"></script>
 
   <script type="text/javascript">
     const lib = libsbml();
@@ -81,9 +82,13 @@
 
         const species = SBMLProcessor.getSpeciesList();
         const parameters = SBMLProcessor.getParameterList();
+        const reactions = SBMLProcessor.reactions;
         var ret = "";
-        ret += "species: " + species.toString() + "\n";
-        ret += "parameters: " + parameters.toString() + "\n";
+        ret += `species: ${species.toString()}\n`;
+        ret += `parameters: ${parameters.toString()}\n`;
+        for (var i = 0; i < reactions.length; i++) {
+          ret += `reaction${i}: ${reactions[i].toString()}\n`;
+        }
         document.getElementById("sbml_output").value = ret;
       } else {
         alert("Input is not SBML!");

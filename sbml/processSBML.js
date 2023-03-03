@@ -1,11 +1,3 @@
-/** Abstraction for a Reaction */
-class Reaction {
-    constructor( libsbmlReaction, functionDefinitions ) {
-        this.reaction = libsbmlReaction;
-        this.reactants = [];
-    }
-}
-
 /** Process SBML file with an input SBML model in string */
 class ProcessSBML {
     constructor( modelStr, pyodide, libsbml ) {
@@ -29,10 +21,10 @@ class ProcessSBML {
         }
         this.functionDefinitions = this.getFunctionDefinitions();
         console.log(this.functionDefinitions);
-        // this.reactions = [];
-        // for (i = 0; i < this.model.getNumReactions(); i++) {
-        //     this.species.push(this.model.getReaction(i), this.functionDefinitions);
-        // }
+        this.reactions = [];
+        for (i = 0; i < this.model.getNumReactions(); i++) {
+            this.reactions.push(new Reaction(this.model.getReaction(i), this.functionDefinitions, libsbml, pyodide));
+        }
     }
 
     getFunctionDefinitions() {
