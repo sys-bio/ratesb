@@ -98,7 +98,6 @@
     async function checkSympy(mathExpr, symbols) {
       const pyodide = await loadPyscriptPackages();
       pyodide.runPython(`
-        name = "aldrich"
         a, b = sympy.symbols("${symbols}")
         js.name = sympy.simplify(${mathExpr})
       `);
