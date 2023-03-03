@@ -17,6 +17,7 @@
   <script src="sbml/processSBML.js" type="text/javascript"></script>
   <script src="sbml/FunctionDefinition.js" type="text/javascript"></script>
   <script src="sbml/Reaction.js" type="text/javascript"></script>
+  <script src="sbml/KineticLaw.js" type="text/javascript"></script>
 
   <script type="text/javascript">
     const lib = libsbml();
@@ -76,7 +77,6 @@
         console.log(lib);
         const SBMLProcessor = new ProcessSBML(modelStr, pyodide, lib);
         console.log(SBMLProcessor);
-        console.log(SBMLProcessor.model.getNumFunctionDefinitions());
 
         const species = SBMLProcessor.getSpeciesList();
         const parameters = SBMLProcessor.getParameterList();

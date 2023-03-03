@@ -20,7 +20,6 @@ class ProcessSBML {
             this.parameters.push(this.model.getParameter(i));
         }
         this.functionDefinitions = this.getFunctionDefinitions();
-        console.log(this.functionDefinitions);
         this.reactions = [];
         for (i = 0; i < this.model.getNumReactions(); i++) {
             this.reactions.push(new Reaction(this.model.getReaction(i), this.functionDefinitions, libsbml, pyodide));

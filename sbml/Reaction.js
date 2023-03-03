@@ -12,7 +12,7 @@ class Reaction {
             this.products.push(this.reaction.getProduct(i));
         }
         this.id = this.reaction.getId();
-        // this.kineticLaw = KineticLaw(this.reaction.getKineticLaw(), this, functionDefinitions, libsbml, pyodide);
+        this.kineticLaw = new KineticLaw(this.reaction.getKineticLaw(), this, functionDefinitions, libsbml, pyodide);
     }
 
     getId() {
@@ -36,11 +36,11 @@ class Reaction {
             productStr += this.products[this.products.length - 1].getSpecies();
         }
         var kineticStr = "";
-        // if (this.kineticLaw.expandedFormula !== null) {
-        //     kineticStr = this.kineticLaw.expandedFormula;
-        // } else {
-        //     kineticStr = this.kineticLaw.formula;
-        // }
+        if (this.kineticLaw.expandedFormula !== null) {
+            kineticStr = this.kineticLaw.expandedFormula;
+        } else {
+            kineticStr = this.kineticLaw.formula;
+        }
         return `${reactantStr} -> ${productStr}; ${kineticStr}`;
     }
 }

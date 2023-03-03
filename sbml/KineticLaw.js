@@ -2,6 +2,7 @@
 
 class KineticLaw {
     constructor( libsbmlKinetics, reaction, functionDefinitions, libsbml, pyodide) {
+        this.pyodide = pyodide;
         this.libsbmlKinetics = libsbmlKinetics;
         this.formula = this.libsbmlKinetics.getFormula();
         this.reaction = reaction;
@@ -11,12 +12,19 @@ class KineticLaw {
         } catch (e) {
             this.symbols = [];
         }
-        if (functionDefinitions == None) {
+        if (functionDefinitions == null) {
             this.expandedFormula = null;
         } else {
             this.expandFormula(functionDefinitions);
         }
         this.expressionFormula = null;
+    }
+
+    toString() {
+        if (this.expandedFormula == null) {
+            return self.formula;
+        }
+        return self.expandedFormula;
     }
 
     expandFormula(functionDefinitions) {
@@ -31,20 +39,32 @@ class KineticLaw {
         var done = true;
         for (var i = 0; i < functionDefinitions.length; i++) {
             var fd = functionDefinitions[i];
-            var rx = new RegExp(String.raw(`${fd.id}\(.*?\)`));
-            var matches = [];
-            var match;
-            while ((match = rx.exec(expansion)) !== null) {
-                matches.push(match);
-            }
-            if (matches.length == 0) {
+            var rx = new RegExp(String.raw`${fd.id}\(.*?\)`);
+            var matches = rx.exec(expansion);
+            var body = String(fd.body);
+            if (matches == null) {
                 continue
             }
             done = false;
             for (var j = 0; j < matches.length; j++) {
-                
+                var rx_arguments = new RegExp(String.raw`\(.*?\)`);
+                var argument_match = rx_arguments.exec(matches[j])[0];
+                argument_match = argument_match.trim();
+                argument_match = argument_match.substring(1, argument_match.length - 1);
+                var call_arguments = argument_match.split(",");
+                for (var k = 0; k < call_arguments.length; k++) {
+                    call_arguments[k] = call_arguments[k].trim();
+                }
+                for (k = 0; k < fd.argumentNames.length; k++) {
+                    body = body.replaceAll(fd.argumentNames[k], call_arguments[k]);
+                }
+                expansion = expansion.replaceAll(matches[j], body);
             }
         }
+        if (!done) {
+            return this._expandFormula(expansion, functionDefinitions, numRecursion + 1, maxRecursion);
+        }
+        return expansion;
     }
 
     
