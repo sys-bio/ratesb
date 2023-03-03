@@ -94,15 +94,6 @@
         alert("Input is not SBML!");
       }
     }
-
-    async function checkSympy(mathExpr, symbols) {
-      const pyodide = await loadPyscriptPackages();
-      pyodide.runPython(`
-        a, b = sympy.symbols("${symbols}")
-        js.name = sympy.simplify(${mathExpr})
-      `);
-      console.log("name: " + name);
-    }
   </script>
 </head>
 
@@ -122,7 +113,7 @@
 
   <button id="ClickMe" class = "btn btn-primary" onclick="readSBMLtext()">Generate SBML</button>
 
-  <button class = "btn btn-primary" id="CopyToClipboard" onclick="checkSympy('a+b+a+b', 'a b')">Copy to Clipboard</button>
+  <button class = "btn btn-primary" id="CopyToClipboard" onclick="copytoclipboard()">Copy to Clipboard</button>
 
   <h5>The SBML is:</h5>
   <div class="form-group purple-border">
