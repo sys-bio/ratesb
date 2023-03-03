@@ -73,8 +73,6 @@
     // write result to the output area
     function changeSBML(modelStr, pyodide) {
       if (modelStr.includes("<sbml")) {
-        // now it is safe to use the module
-        
         console.log(lib);
         const SBMLProcessor = new ProcessSBML(modelStr, pyodide, lib);
         console.log(SBMLProcessor);
