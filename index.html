@@ -14,10 +14,12 @@
   <!-- Importing js files -->
   <script src="sbml/libsbml.js" type="text/javascript"></script>
   <script src="sbml/libsbml.wasm" type="application/wasm"></script>
+  <script src="sbml/utils.js" type="text/javascript"></script>
   <script src="sbml/processSBML.js" type="text/javascript"></script>
   <script src="sbml/FunctionDefinition.js" type="text/javascript"></script>
   <script src="sbml/Reaction.js" type="text/javascript"></script>
   <script src="sbml/KineticLaw.js" type="text/javascript"></script>
+  <script src="sbml/constants.js" type="text/javascript"></script>
 
   <script type="text/javascript">
     const lib = libsbml();
@@ -26,6 +28,7 @@
       await pyodide.loadPackage("micropip");
       const micropip = pyodide.pyimport("micropip");
       await micropip.install('sympy');
+      // await micropip.install('SBMLKinetics')
       pyodide.runPython(`
         import js
         import sympy

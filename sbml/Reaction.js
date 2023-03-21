@@ -1,18 +1,20 @@
 /** Abstraction for a Reaction */
 class Reaction {
-    constructor( libsbmlReaction, functionDefinitions, libsbml, pyodide ) {
+    constructor( libsbmlReaction, functionDefinitions, pyodide, processSBML ) {
         this.reaction = libsbmlReaction;
-        this.reactants = [];
-        this.products = [];
+        this.reactantList = [];
         var i;
         for (i = 0; i < this.reaction.getNumReactants(); i++) {
-            this.reactants.push(this.reaction.getReactant(i));
+            var reactant = this.reaction.getReactant(i);
+            this.reactantList.push(reactant.getSpecies());
         }
+        this.productList = [];
         for (i = 0; i < this.reaction.getNumProducts(); i++) {
-            this.products.push(this.reaction.getProduct(i));
+            var product = this.reaction.getProduct(i)
+            this.productList.push(product.getSpecies());
         }
         this.id = this.reaction.getId();
-        this.kineticLaw = new KineticLaw(this.reaction.getKineticLaw(), this, functionDefinitions, libsbml, pyodide);
+        this.kineticLaw = new KineticLaw(this.reaction.getKineticLaw(), this, functionDefinitions, pyodide, processSBML);
     }
 
     getId() {
@@ -23,17 +25,17 @@ class Reaction {
         var i;
         var reactantStr = "";
         var productStr = "";
-        for (i = 0; i < this.reactants.length - 1; i++) {
-            reactantStr += `${this.reactants[i].getSpecies()} + `;
+        for (i = 0; i < this.reactantList.length - 1; i++) {
+            reactantStr += `${this.reactantList[i]} + `;
         }
-        for (i = 0; i < this.products.length - 1; i++) {
-            productStr += `${this.products[i].getSpecies()} + `;
+        for (i = 0; i < this.productList.length - 1; i++) {
+            productStr += `${this.productList[i]} + `;
         }
-        if (this.reactants.length > 0) {
-            reactantStr += this.reactants[this.reactants.length - 1].getSpecies();
+        if (this.reactantList.length > 0) {
+            reactantStr += this.reactantList[this.reactantList.length - 1];
         }
-        if (this.products.length > 0) {
-            productStr += this.products[this.products.length - 1].getSpecies();
+        if (this.productList.length > 0) {
+            productStr += this.productList[this.productList.length - 1];
         }
         var kineticStr = "";
         if (this.kineticLaw.expandedFormula !== null) {

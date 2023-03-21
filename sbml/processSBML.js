@@ -5,6 +5,10 @@ class ProcessSBML {
         this.libsbml = libsbml;
         const reader = new this.libsbml.SBMLReader();
         const sbmlDoc = reader.readSBMLFromString(modelStr);
+        // const converter = libsbml.LocalParameter;
+        // console.log(converter)
+        // converter.setDocument(sbmlDoc);
+        // converter.convert();
         const libsbmlModel = sbmlDoc.getModel();
         this.model = libsbmlModel;
         console.log(this.model);
@@ -19,10 +23,18 @@ class ProcessSBML {
         for (i = 0; i < this.model.getNumParameters(); i++) {
             this.parameters.push(this.model.getParameter(i));
         }
+        this.speciesList = this.getSpeciesList();
+        this.parameterList = this.getParameterList();
+        this.compartmentList = this.getCompartmentList();
+        this.pyodide.runPython(`
+            ${this.parameterList.toString()} = sympy.symbols("${this.parameterList.join(" ")}")
+            ${this.speciesList.toString()} = sympy.symbols("${this.speciesList.join(" ")}")
+            ${this.compartmentList.toString()} = sympy.symbols("${this.compartmentList.join(" ")}")
+        `);
         this.functionDefinitions = this.getFunctionDefinitions();
         this.reactions = [];
         for (i = 0; i < this.model.getNumReactions(); i++) {
-            this.reactions.push(new Reaction(this.model.getReaction(i), this.functionDefinitions, libsbml, pyodide));
+            this.reactions.push(new Reaction(this.model.getReaction(i), this.functionDefinitions, pyodide, this));
         }
     }
 
@@ -49,5 +61,13 @@ class ProcessSBML {
           parameters[i] = this.model.getParameter(i).getId();
         }
         return parameters;
+    }
+
+    getCompartmentList() {
+        const compartments = new Array(this.model.getNumCompartments());
+        for (var i = 0; i < this.model.getNumCompartments(); i++) {
+            compartments[i] = this.model.getCompartment(i).getId();
+        }
+        return compartments;
     }
 }
