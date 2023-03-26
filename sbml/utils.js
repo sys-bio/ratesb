@@ -10,7 +10,6 @@ function compareMaps(map1, map2) {
         return false;
     }
     for (let [key, val] of map1) {
-        console.log(key, val)
         testVal = map2.get(key);
         // in cases of an undefined value, make sure the key
         // actually exists on the object so there are no false positives
@@ -28,7 +27,7 @@ function compareLists(a, b) {
     if (a.length != b.length) {
         return false;
     }
-    
+
     var seen = {};
     a.forEach(function(v) {
         var key = (typeof v) + v;
@@ -48,3 +47,7 @@ function compareLists(a, b) {
     });
 
 }
+
+exports.Counter = Counter;
+exports.compareMaps = compareMaps;
+exports.compareLists = compareLists;

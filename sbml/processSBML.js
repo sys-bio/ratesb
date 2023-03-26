@@ -26,15 +26,28 @@ class ProcessSBML {
         this.speciesList = this.getSpeciesList();
         this.parameterList = this.getParameterList();
         this.compartmentList = this.getCompartmentList();
-        this.pyodide.runPython(`
-            ${this.parameterList.toString()} = sympy.symbols("${this.parameterList.join(" ")}")
-            ${this.speciesList.toString()} = sympy.symbols("${this.speciesList.join(" ")}")
-            ${this.compartmentList.toString()} = sympy.symbols("${this.compartmentList.join(" ")}")
-        `);
+        console.log(this.speciesList)
+        if (this.speciesList.length > 0) {
+            this.pyodide.runPython(`
+                ${this.speciesList.toString()} = sympy.symbols("${this.speciesList.join(" ")}")
+            `);
+        }
+        console.log(this.parameterList)
+        if (this.parameterList.length > 0) {
+            this.pyodide.runPython(`
+                ${this.parameterList.toString()} = sympy.symbols("${this.parameterList.join(" ")}")
+            `);
+        }
+        console.log(this.compartmentList)
+        if (this.compartmentList.length > 0) {
+            this.pyodide.runPython(`
+                ${this.compartmentList.toString()} = sympy.symbols("${this.compartmentList.join(" ")}")
+            `);
+        }
         this.functionDefinitions = this.getFunctionDefinitions();
         this.reactions = [];
         for (i = 0; i < this.model.getNumReactions(); i++) {
-            this.reactions.push(new Reaction(this.model.getReaction(i), this.functionDefinitions, pyodide, this));
+            this.reactions.push(new Reaction(this.model, this.model.getReaction(i), this.functionDefinitions, pyodide, this));
         }
     }
 
@@ -48,25 +61,25 @@ class ProcessSBML {
 
     // Get all species in the model
     getSpeciesList() {
-        const species = new Array(this.model.getNumSpecies());
+        const species = [];
         for (var i = 0; i < this.model.getNumSpecies(); i++) {
-          species[i] = this.model.getSpecies(i).getId();
+          species.push(this.model.getSpecies(i).getId());
         }
         return species;
     }
 
     getParameterList() {
-        const parameters = new Array(this.model.getNumParameters());
+        const parameters = [];
         for (var i = 0; i < this.model.getNumParameters(); i++) {
-          parameters[i] = this.model.getParameter(i).getId();
+          parameters.push(this.model.getParameter(i).getId());
         }
         return parameters;
     }
 
     getCompartmentList() {
-        const compartments = new Array(this.model.getNumCompartments());
+        const compartments = [];
         for (var i = 0; i < this.model.getNumCompartments(); i++) {
-            compartments[i] = this.model.getCompartment(i).getId();
+            compartments.push(this.model.getCompartment(i).getId());
         }
         return compartments;
     }

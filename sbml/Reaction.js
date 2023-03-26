@@ -1,7 +1,8 @@
 /** Abstraction for a Reaction */
 class Reaction {
-    constructor( libsbmlReaction, functionDefinitions, pyodide, processSBML ) {
+    constructor( libsbmlModel, libsbmlReaction, functionDefinitions, pyodide, processSBML ) {
         this.reaction = libsbmlReaction;
+        console.log(this.reaction)
         this.reactantList = [];
         var i;
         for (i = 0; i < this.reaction.getNumReactants(); i++) {
@@ -14,7 +15,7 @@ class Reaction {
             this.productList.push(product.getSpecies());
         }
         this.id = this.reaction.getId();
-        this.kineticLaw = new KineticLaw(this.reaction.getKineticLaw(), this, functionDefinitions, pyodide, processSBML);
+        this.kineticLaw = new KineticLaw(libsbmlModel, libsbmlReaction, this.reaction.getKineticLaw(), this, functionDefinitions, pyodide, processSBML);
     }
 
     getId() {

@@ -1,9 +1,12 @@
 /** Provides Information on SBML Kinetics Laws */
 
 class KineticLaw {
-    constructor( libsbmlKinetics, reaction, functionDefinitions, pyodide, processSBML) {
+    constructor( libsbmlModel, libsbmlReaction, libsbmlKinetics, reaction, functionDefinitions, pyodide, processSBML) {
+        this.libsbmlModel = libsbmlModel;
+        this.libsbmlReaction = libsbmlReaction;
         this.pyodide = pyodide;
         this.libsbmlKinetics = libsbmlKinetics;
+        console.log(this.libsbmlKinetics);
         this.formula = this.libsbmlKinetics.getFormula();
         this.reaction = reaction;
         this.model = processSBML;
@@ -27,7 +30,8 @@ class KineticLaw {
             this.expandFormula(functionDefinitions);
         }
         this.sympyFormula = this.expandedFormula.replaceAll("^", "**");
-        this.classificationCp = [];
+        this.classificationCp = {};
+        this.analysis = {};
         this.classify();
     }
 
@@ -71,7 +75,7 @@ class KineticLaw {
         console.log(this.expandedFormula);
         if (idsList.length > 0) {
             this.pyodide.runPython(`
-            ${idsList.toString()} = sympy.symbols("${symbolsSpace}")
+                ${idsList.toString()} = sympy.symbols("${symbolsSpace}")
             `);
         }
         this.pyodide.runPython(`
@@ -87,57 +91,258 @@ class KineticLaw {
         var productList = this.reaction.productList;
         var kinetics = this.expandedFormula;
 
-        this.classificationCp.push(this.isZerothOrder(speciesInKineticLaw));
-        this.classificationCp.push(this.isPowerTerms(kinetics, kineticsSim));
-        this.classificationCp.push(this.isUNDR(reactantList, kinetics, kineticsSim, speciesInKineticLaw, idsList));
-        this.classificationCp.push(this.isUNMO(reactantList, kinetics, kineticsSim, speciesInKineticLaw, idsList));
-        this.classificationCp.push(this.isBIDR(reactantList, productList, kinetics, kineticsSim, speciesInKineticLaw, idsList));
-        this.classificationCp.push(this.isBIMO(reactantList, productList, kinetics, kineticsSim, speciesInKineticLaw, idsList));
-        this.classificationCp.push(this.isMM(kinetics, kineticsSim, idsList, speciesInKineticLaw, parametersInKineticLaw, reactantList));
-        this.classificationCp.push(this.isMMcat(kinetics, kineticsSim, idsList, speciesInKineticLaw, parametersInKineticLaw, reactantList));
-        this.classificationCp.push(this.isHill(kineticsSim, idsList, speciesInKineticLaw));
-        this.classificationCp.push(this.isFraction(kineticsSim, idsList, speciesInKineticLaw));
-        this.classificationCp.push(this.isPolynomial(kineticsSim, idsList, speciesInKineticLaw));
+        this.classificationCp["zerothOrder"] = this.isZerothOrder(speciesInKineticLaw);
+        this.classificationCp["powerTerms"] = this.isPowerTerms(kinetics, kineticsSim);
+        this.classificationCp["UNDR"] = this.isUNDR(reactantList, kinetics, kineticsSim, speciesInKineticLaw, idsList);
+        this.classificationCp["UNMO"] = this.isUNMO(reactantList, kinetics, kineticsSim, speciesInKineticLaw, idsList);
+        this.classificationCp["BIDR"] = this.isBIDR(reactantList, productList, kinetics, kineticsSim, speciesInKineticLaw, idsList);
+        this.classificationCp["BIMO"] = this.isBIMO(reactantList, productList, kinetics, kineticsSim, speciesInKineticLaw, idsList);
+        this.classificationCp["MM"] = this.isMM(kinetics, kineticsSim, idsList, speciesInKineticLaw, parametersInKineticLaw, reactantList);
+        this.classificationCp["MMcat"] = this.isMMcat(kinetics, kineticsSim, idsList, speciesInKineticLaw, parametersInKineticLaw, reactantList);
+        this.classificationCp["Hill"] = this.isHill(kineticsSim, idsList, speciesInKineticLaw);
+        this.classificationCp["Fraction"] = this.isFraction(kineticsSim, idsList, speciesInKineticLaw);
+        this.classificationCp["Polynomial"] = this.isPolynomial(kineticsSim, idsList, speciesInKineticLaw);
 
-        console.log(this.classificationCp)
+        console.log(this.classificationCp);
+        this.kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLaw, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList);
     }
 
+    kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLaw, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList) {
+        this.analysis["floatingSpecies"] = this.checkFloatingSpecies(speciesInKineticLaw, reactantList, productList);
+        this.analysis["nonIncreasingSpecies"] = this.checkNonIncreasingSpecies(speciesInKineticLaw, parametersInKineticLaw, reactantList, productList, kinetics);
+        console.log(this.analysis);
+    }
+
+    /**
+     * Check if the rate law contains all reactants
+     * If reversible, check if the rate law contains all products
+     * Return a list of species that violates this rule
+     * @param {[]} speciesInKineticLaw list-species in the kinetics
+     * @param {[]} reactantList list-reactants of the reaction
+     * @param {[]} productList list-products of the reaction
+     * @return {[]} list of species violating the rule
+     */
+    checkFloatingSpecies(speciesInKineticLaw, reactantList, productList) {
+        var floatingSpecies = [];
+        reactantList.forEach(reactant => {
+            if (!speciesInKineticLaw.includes(reactant)) {
+                floatingSpecies.push(reactant);
+            }
+        });
+        if (this.libsbmlReaction.getReversible()) {
+            productList.forEach(product => {
+                if (!speciesInKineticLaw.includes(product)) {
+                    floatingSpecies.push(product);
+                }
+            });
+        }
+        return floatingSpecies;
+    }
+
+    /**
+     * Check if the rate law is increasing as each reactant increases
+     * If reversible, check if the rate law is decreasing as each product increases
+     * Return a list of species that violates this rule
+     * @param {[]} speciesInKineticLaw list-species in the kinetics
+     * @param {[]} parametersInKineticLaw list-parameters in the kinetics
+     * @param {[]} reactantList list-reactants of the reaction
+     * @param {[]} productList list-products of the reaction
+     * @param {string} kinetics string-kinetics
+     * @return {[]} list of species violating the rule
+     */
+    checkNonIncreasingSpecies(speciesInKineticLaw, parametersInKineticLaw, reactantList, productList, kinetics) {
+        console.log(speciesInKineticLaw)
+        console.log(parametersInKineticLaw)
+        console.log(reactantList)
+        console.log(productList)
+        console.log(kinetics)
+        var nonIncreasingSpecies = [];
+        var i;
+        for (i = 0; i < this.libsbmlModel.getNumCompartments(); i++) {
+            if (parametersInKineticLaw.includes(this.libsbmlModel.getCompartment(i).getId())) {
+                console.log(this.libsbmlModel.getCompartment(i))
+                this.pyodide.runPython(`
+                    ${this.libsbmlModel.getCompartment(i).getId()} = 1
+                `);
+            }
+        }
+        var param;
+        for (i = 0; i < this.libsbmlKinetics.getNumParameters(); i++) {
+            param = this.libsbmlKinetics.getParameter(i);
+            this.pyodide.runPython(`
+                ${param.getId()} =  ${param.getValue() > 0 ? 1 : param.getValue() < 0 ? -1 : 0}
+            `);
+        }
+        for (i = 0; i < this.libsbmlKinetics.getNumLocalParameters(); i++) {
+            param = this.libsbmlKinetics.getLocalParameter(i);
+            this.pyodide.runPython(`
+                ${param.getId()} = ${param.getValue() > 0 ? 1 : param.getValue() < 0 ? -1 : 0}
+            `);
+        }
+        reactantList.forEach(reactant => {
+            speciesInKineticLaw.forEach(otherSpecies => {
+                if (otherSpecies !== reactant) {
+                    this.pyodide.runPython(`
+                        ${otherSpecies} = 1
+                    `);
+                }
+            });
+            console.log(reactant)
+            this.pyodide.runPython(`
+                diff_kinetics = sympy.diff(${kinetics}, ${reactant})
+                ddx = sympy.lambdify(${reactant}, diff_kinetics)
+                js.isIncreasing = ddx(1) > 0
+            `);
+            if (!isIncreasing) {
+                nonIncreasingSpecies.push(reactant);
+            }
+            speciesInKineticLaw.forEach(otherSpecies => {
+                this.pyodide.runPython(`
+                    ${otherSpecies} = sympy.symbols("${otherSpecies}")
+                `);
+            });
+        });
+        if (this.libsbmlReaction.getReversible()) {
+            productList.forEach(product => {
+                productList.forEach(otherProduct => {
+                    if (otherProduct !== product) {
+                        this.pyodide.runPython(`
+                            ${otherProduct} = 1
+                        `);
+                    }
+                });
+                this.pyodide.runPython(`
+                    diff_kinetics = sympy.diff(${kinetics}, ${product})
+                    ddu = sympy.lambdify(${product}, diff_kinetics)
+                    js.isIncreasing = ddx(1) < 0
+                `);
+                if (!isIncreasing) {
+                    nonIncreasingSpecies.push(product);
+                }
+                speciesInKineticLaw.forEach(otherSpecies => {
+                    this.pyodide.runPython(`
+                        ${otherSpecies} = sympy.symbols("${otherSpecies}")
+                    `);
+                });
+            });
+        }
+        return nonIncreasingSpecies;
+    }
+
+    /**
+     * Check whether the reaction with a kinetic law belongs to the type of Zeroth Order
+     * Zeroth order classification rule: if there are no species in the kinetics
+     * @param {[]} speciesInKineticLaw list-species in the kinetics
+     * @returns {boolean} whether the rate law is zeroth order
+     */
     isZerothOrder(speciesInKineticLaw) {
         return this._numSpeciesInKinetics(speciesInKineticLaw) == 0;
     }
 
+    /**
+     * Check whether the reaction with a kinetic law belongs to the type of Kinetics with power terms
+     * Kinetics with power terms classification rule: if there is pow() or ** inside the kinetics,
+     * except the pow(,-1) case as the possible Michaelis–Menten kinetics
+     * @param {string} kinetics string-kinetics
+     * @param {string} kineticsSim string-simplified kinetics
+     * @returns {boolean} whether the rate law is the type of Kinetics with power terms
+     */
     isPowerTerms(kinetics, kineticsSim) {
         return this._powerInKinetics(kinetics, kineticsSim);
     }
 
+    /**
+     * Tests whether the reaction belongs to the type of No Products
+     * No products classification rule: if there are no products
+     * @param {[]} productList list-products of the reaction
+     * @returns {boolean} whether the reaction belongs to the type of No Products
+     */
     isNoPrds(productList) {
         return this._numOfPrds(productList) == 0;
     }
 
+    /**
+     * Tests whether the reaction belongs to the type of Single Products
+     * No products classification rule: if there is a single product
+     * @param {[]} productList list-products of the reaction
+     * @returns {boolean} whether the reaction belongs to the type of Single Products
+     */
     isSinglePrd(productList) {
         return this._numOfPrds(productList) == 1;
     }
 
+    /**
+     * Tests whether the reaction belongs to the type of Double Products
+     * No products classification rule: if there are two products
+     * @param {[]} productList list-products of the reaction
+     * @returns {boolean} whether the reaction belongs to the type of Double Products
+     */
     isDoublePrds(productList) {
         return this._numOfPrds(productList) == 2;
     }
 
+    /**
+     * Tests whether the reaction belongs to the type of Multiple Products
+     * No products classification rule: if there are more than two products
+     * @param {[]} productList list-products of the reaction
+     * @returns {boolean} whether the reaction belongs to the type of Multiple Products
+     */
+    isMulPrds(productList) {
+        return this._numOfPrds(productList) > 2;
+    }
+
+    /**
+     * Tests whether the reaction belongs to the type of No Reactants
+     * No reactants classification rule: if there are no reactants
+     * @param {[]} reactantList list-reactants of the reaction
+     * @returns {boolean} whether the reaction belongs to the type of No Reactants
+     */
     isNoRcts(reactantList) {
         return this._numOfRcts(reactantList) == 0;
     }
 
+    /**
+     * Tests whether the reaction belongs to the type of Single Reactants
+     * No reactants classification rule: if there is a single product
+     * @param {[]} reactantList list-reactants of the reaction
+     * @returns {boolean} whether the reaction belongs to the type of Single Reactants
+     */
     isSingleRct(reactantList) {
         return this._numOfRcts(reactantList) == 1;
     }
 
+    /**
+     * Tests whether the reaction belongs to the type of Double Reactants
+     * No reactants classification rule: if there are two reactants
+     * @param {[]} reactantList list-reactants of the reaction
+     * @returns {boolean} whether the reaction belongs to the type of Double Reactants
+     */
     isDoubleRcts(reactantList) {
         return this._numOfRcts(reactantList) == 2;
     }
 
+    /**
+     * Tests whether the reaction belongs to the type of Multiple Reactants
+     * No reactants classification rule: if there are more than two reactants
+     * @param {[]} reactantList list-reactants of the reaction
+     * @returns {boolean} whether the reaction belongs to the type of Multiple Reactants
+     */
     isMulRcts(reactantList) {
         return this._numOfRcts(reactantList) > 2;
     }
 
+    /**
+     * Tests whether the reaction belongs to the type of uni-directional mass reaction
+     * Uni-directional mass reaction classification rule: 
+     * 1) Kinetics is a single product of terms or with an additional const term
+     * 2) The species inside the kinetics are only reactants
+     * @param {[]} reactantList list-reactants of the reaction
+     * @param {string} kinetics string-kinetics
+     * @param {string} kineticsSim string-simplified kinetics
+     * @param {[]} speciesInKineticLaw list-species in the kinetics
+     * @param {[]} idsList list-id list including all the ids in kinetics, reactants and products
+     * @returns {boolean} whether the rate law is UNDR
+     */
     isUNDR(reactantList, kinetics, kineticsSim, speciesInKineticLaw, idsList) {
         var flag = false;
         if (this._isSingleProductOfTerms(kinetics, kineticsSim) && this._specsInKineticsAllRcts(speciesInKineticLaw, reactantList)) {
@@ -165,6 +370,18 @@ class KineticLaw {
         return flag;
     }
 
+    /**
+     * Tests whether the reaction belongs to the type of uni-term with moderator
+     * Uni-term with moderator classification rule: 
+     * 1) Kinetics is a single product of terms
+     * 2) The species inside the kinetics are not only reactants
+     * @param {[]} reactantList list-reactants of the reaction
+     * @param {string} kinetics string-kinetics
+     * @param {string} kineticsSim string-simplified kinetics
+     * @param {[]} speciesInKineticLaw list-species in the kinetics
+     * @param {[]} idsList list-id list including all the ids in kinetics, reactants and products
+     * @returns {boolean} whether the rate law is UNMO
+     */
     isUNMO(reactantList, kinetics, kineticsSim, speciesInKineticLaw, idsList) {
         var flag = false;
         if (this._isSingleProductOfTerms(kinetics, kineticsSim)
@@ -192,6 +409,20 @@ class KineticLaw {
         return flag;
     }
 
+    /**
+     * Tests whether the reaction belongs to the type of bi-directional mass reaction
+     * Bi-directional mass reactionclassification rule: 
+     * 1) Kinetics is the difference of two product of terms, with species in each term
+     * 2) The first term before - includes all the reactants
+     *    while the second term after - includes all the products
+     * @param {[]} reactantList list-reactants of the reaction
+     * @param {[]} productList list-products of the reaction
+     * @param {string} kinetics string-kinetics
+     * @param {string} kineticsSim string-simplified kinetics
+     * @param {[]} speciesInKineticLaw list-species in the kinetics
+     * @param {[]} idsList list-id list including all the ids in kinetics, reactants and products
+     * @returns {boolean} whether the rate law is BIDR
+     */
     isBIDR(reactantList, productList, kinetics, kineticsSim, speciesInKineticLaw, idsList) {
         var flag = true;
         if (!this._isDiffOfTwoProductsOfTerms(kinetics, kineticsSim)) {
@@ -213,6 +444,20 @@ class KineticLaw {
         return flag;
     }
 
+    /**
+     * Tests whether the reaction belongs to the type of bi-terms with moderator
+     * Bi-terms with moderator classification rule: 
+     * 1) Kinetics is the difference of two product of terms
+     * 2) The first term before - does not include all the reactants
+     *    while the second term after - does not include all the products
+     * @param {[]} reactantList list-reactants of the reaction
+     * @param {[]} productList list-products of the reaction
+     * @param {string} kinetics string-kinetics
+     * @param {string} kineticsSim string-simplified kinetics
+     * @param {[]} speciesInKineticLaw list-species in the kinetics
+     * @param {[]} idsList list-id list including all the ids in kinetics, reactants and products
+     * @returns {boolean} whether the rate law is BIMO
+     */
     isBIMO(reactantList, productList, kinetics, kineticsSim, speciesInKineticLaw, idsList) {
         var flag = true;
         if (this._numSpeciesInKinetics(speciesInKineticLaw) == 0) {
@@ -797,7 +1042,7 @@ class KineticLaw {
             var matches = rx.exec(expansion);
             var body = String(fd.body);
             if (matches == null) {
-                continue
+                continue;
             }
             done = false;
             for (var j = 0; j < matches.length; j++) {
