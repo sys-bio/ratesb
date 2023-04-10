@@ -12,8 +12,10 @@ class FunctionDefinition {
     }
 
     toString() {
-        argumentCall = this.argumentNames.toString();
-        callStr = `${this.id}(${argumentCall})`;
+        var argumentCall = this.argumentNames.toString();
+        var callStr = `${this.id}(${argumentCall})`;
         return `${callStr}: ${this.body}`;
     }
 }
+
+module.exports = FunctionDefinition;

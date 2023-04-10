@@ -98,7 +98,7 @@ class KineticLaw {
         this.classificationCp["BIDR"] = this.isBIDR(reactantList, productList, kinetics, kineticsSim, speciesInKineticLaw, idsList);
         this.classificationCp["BIMO"] = this.isBIMO(reactantList, productList, kinetics, kineticsSim, speciesInKineticLaw, idsList);
         this.classificationCp["MM"] = this.isMM(kinetics, kineticsSim, idsList, speciesInKineticLaw, parametersInKineticLaw, reactantList);
-        this.classificationCp["MMcat"] = this.isMMcat(kinetics, kineticsSim, idsList, speciesInKineticLaw, parametersInKineticLaw, reactantList);
+        this.classificationCp["MMcat"] = this.isMMcat(kinetics, kineticsSim, idsList, speciesInKineticLaw, parametersInKineticLaw, reactantList, productList);
         this.classificationCp["Hill"] = this.isHill(kineticsSim, idsList, speciesInKineticLaw);
         this.classificationCp["Fraction"] = this.isFraction(kineticsSim, idsList, speciesInKineticLaw);
         this.classificationCp["Polynomial"] = this.isPolynomial(kineticsSim, idsList, speciesInKineticLaw);
@@ -108,9 +108,55 @@ class KineticLaw {
     }
 
     kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLaw, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList) {
-        this.analysis["floatingSpecies"] = this.checkFloatingSpecies(speciesInKineticLaw, reactantList, productList);
+        var namingConventionCheck = true;
+        this.assignPythonVals();
+        this.analysis["floatingSpecies"] = this.checkFloatingSpecies(speciesInKineticLaw, reactantList);
+        this.analysis["inconsistentProducts"] = this.checkIrreversibleProduct(speciesInKineticLaw, productList);
         this.analysis["nonIncreasingSpecies"] = this.checkNonIncreasingSpecies(speciesInKineticLaw, parametersInKineticLaw, reactantList, productList, kinetics);
-        console.log(this.analysis);
+        if (namingConventionCheck) {
+            this.analysis["namingConvention"] = this.checkNamingConventions(speciesInKineticLaw, parametersInKineticLaw, reactantList, productList, kinetics);
+        } else {
+            this.analysis["namingConvention"] = [];
+        }
+        this.assignPythonSymbols();
+    }
+
+    assignPythonVals() {
+        var object;
+        var val;
+        for (var i = 0; i < this.libsbmlModel.getNumParameters(); i++) {
+            object = this.libsbmlModel.getParameter(i);
+            val = object.getValue();
+            if (val == 0 || isNaN(val)) {
+                // need to give warning if val is not assigned
+                val = 1;
+            }
+            this.pyodide.runPython(`
+                ${object.getId()} = ${val}
+            `);
+        }
+        for (var i = 0; i < this.libsbmlModel.getNumCompartments(); i++) {
+            object = this.libsbmlModel.getCompartment(i);
+            this.pyodide.runPython(`
+                ${object.getId()} = ${object.getSize()}
+            `);
+        }
+    }
+
+    assignPythonSymbols() {
+        var id;
+        for (var i = 0; i < this.libsbmlModel.getNumParameters(); i++) {
+            id = this.libsbmlModel.getParameter(i).getId();
+            this.pyodide.runPython(`
+                ${id} = sympy.symbols("${id}")
+            `);
+        }
+        for (var i = 0; i < this.libsbmlModel.getNumCompartments(); i++) {
+            id = this.libsbmlModel.getCompartment(i).getId();
+            this.pyodide.runPython(`
+                ${id} = sympy.symbols("${id}")
+            `);
+        }
     }
 
     /**
@@ -119,24 +165,28 @@ class KineticLaw {
      * Return a list of species that violates this rule
      * @param {[]} speciesInKineticLaw list-species in the kinetics
      * @param {[]} reactantList list-reactants of the reaction
-     * @param {[]} productList list-products of the reaction
      * @return {[]} list of species violating the rule
      */
-    checkFloatingSpecies(speciesInKineticLaw, reactantList, productList) {
+    checkFloatingSpecies(speciesInKineticLaw, reactantList) {
         var floatingSpecies = [];
         reactantList.forEach(reactant => {
             if (!speciesInKineticLaw.includes(reactant)) {
                 floatingSpecies.push(reactant);
             }
         });
-        if (this.libsbmlReaction.getReversible()) {
+        return floatingSpecies;
+    }
+
+    checkIrreversibleProduct(speciesInKineticLaw, productList) {
+        var inconsistentProducts = [];
+        if (!this.libsbmlReaction.getReversible()) {
             productList.forEach(product => {
-                if (!speciesInKineticLaw.includes(product)) {
-                    floatingSpecies.push(product);
+                if (speciesInKineticLaw.includes(product)) {
+                    inconsistentProducts.push(product);
                 }
             });
         }
-        return floatingSpecies;
+        return inconsistentProducts;
     }
 
     /**
@@ -151,82 +201,128 @@ class KineticLaw {
      * @return {[]} list of species violating the rule
      */
     checkNonIncreasingSpecies(speciesInKineticLaw, parametersInKineticLaw, reactantList, productList, kinetics) {
-        console.log(speciesInKineticLaw)
-        console.log(parametersInKineticLaw)
-        console.log(reactantList)
-        console.log(productList)
-        console.log(kinetics)
+        // console.log(speciesInKineticLaw)
+        // console.log(parametersInKineticLaw)
+        // console.log(reactantList)
+        // console.log(productList)
+        // console.log(kinetics)
         var nonIncreasingSpecies = [];
-        var i;
-        for (i = 0; i < this.libsbmlModel.getNumCompartments(); i++) {
-            if (parametersInKineticLaw.includes(this.libsbmlModel.getCompartment(i).getId())) {
-                console.log(this.libsbmlModel.getCompartment(i))
-                this.pyodide.runPython(`
-                    ${this.libsbmlModel.getCompartment(i).getId()} = 1
-                `);
-            }
-        }
-        var param;
-        for (i = 0; i < this.libsbmlKinetics.getNumParameters(); i++) {
-            param = this.libsbmlKinetics.getParameter(i);
-            this.pyodide.runPython(`
-                ${param.getId()} =  ${param.getValue() > 0 ? 1 : param.getValue() < 0 ? -1 : 0}
-            `);
-        }
-        for (i = 0; i < this.libsbmlKinetics.getNumLocalParameters(); i++) {
-            param = this.libsbmlKinetics.getLocalParameter(i);
-            this.pyodide.runPython(`
-                ${param.getId()} = ${param.getValue() > 0 ? 1 : param.getValue() < 0 ? -1 : 0}
-            `);
-        }
+
+        this._assignPythonLocalVals();
+        var prev;
         reactantList.forEach(reactant => {
-            speciesInKineticLaw.forEach(otherSpecies => {
-                if (otherSpecies !== reactant) {
-                    this.pyodide.runPython(`
-                        ${otherSpecies} = 1
-                    `);
-                }
-            });
-            console.log(reactant)
-            this.pyodide.runPython(`
-                diff_kinetics = sympy.diff(${kinetics}, ${reactant})
-                ddx = sympy.lambdify(${reactant}, diff_kinetics)
-                js.isIncreasing = ddx(1) > 0
-            `);
-            if (!isIncreasing) {
-                nonIncreasingSpecies.push(reactant);
-            }
-            speciesInKineticLaw.forEach(otherSpecies => {
+            this._assignOtherSpeciesVals(reactant, speciesInKineticLaw, 1);
+            prev = 0;
+            for (var i = -1; i <= 1; i += 0.1) {
                 this.pyodide.runPython(`
-                    ${otherSpecies} = sympy.symbols("${otherSpecies}")
+                    ${reactant} = ${Math.pow(10, i)}
+                    js.curr = ${kinetics}
                 `);
-            });
+                if (curr <= prev) {
+                    nonIncreasingSpecies.push(reactant);
+                    break;
+                }
+                prev = curr;
+            }
+            this._assignPythonLocalSymbols(speciesInKineticLaw);
         });
         if (this.libsbmlReaction.getReversible()) {
             productList.forEach(product => {
-                productList.forEach(otherProduct => {
-                    if (otherProduct !== product) {
+                if (speciesInKineticLaw.includes(product)) {
+                    this._assignOtherSpeciesVals(product, speciesInKineticLaw, 1);
+                    for (var i = -1; i <= 1; i += 0.1) {
                         this.pyodide.runPython(`
-                            ${otherProduct} = 1
+                            ${product} = ${Math.pow(10, i)}
+                            js.curr = ${kinetics}
                         `);
+                        if (curr >= prev) {
+                            nonIncreasingSpecies.push(product);
+                            break;
+                        }
+                        prev = curr;
                     }
-                });
-                this.pyodide.runPython(`
-                    diff_kinetics = sympy.diff(${kinetics}, ${product})
-                    ddu = sympy.lambdify(${product}, diff_kinetics)
-                    js.isIncreasing = ddx(1) < 0
-                `);
-                if (!isIncreasing) {
-                    nonIncreasingSpecies.push(product);
+                    this._assignSpeciesSymbols(speciesInKineticLaw);
                 }
-                speciesInKineticLaw.forEach(otherSpecies => {
-                    this.pyodide.runPython(`
-                        ${otherSpecies} = sympy.symbols("${otherSpecies}")
-                    `);
-                });
             });
         }
+        this._assignPythonLocalSymbols();
         return nonIncreasingSpecies;
+    }
+
+    checkNamingConventions() {
+        var ret = [];
+        if (this.classificationCp["zerothOrder"]) {
+            
+        } else if (this.classificationCp["powerTerms"]) {
+
+        } else if (this.classificationCp["UNDR"]) {
+
+        } else if (this.classificationCp["UNMO"]) {
+            
+        } else if (this.classificationCp["BIDR"]) {
+            
+        } else if (this.classificationCp["BIMO"]) {
+            
+        } else if (this.classificationCp["MM"]) {
+            
+        } else if (this.classificationCp["MMcat"]) {
+            
+        } else if (this.classificationCp["Hill"]) {
+
+        } else if (this.classificationCp["Fraction"]) {
+            
+        } else if (this.classificationCp["Polynomial"]) {
+            
+        }
+        return ret;
+    }
+
+    _assignPythonLocalVals() {
+        for (var i = 0; i < this.libsbmlKinetics.getNumParameters(); i++) {
+            var param = this.libsbmlKinetics.getParameter(i);
+            this.pyodide.runPython(`
+                ${param.getId()} = ${param.getValue()}
+            `);
+        }
+        for (var i = 0; i < this.libsbmlKinetics.getNumLocalParameters(); i++) {
+            var param = this.libsbmlKinetics.getLocalParameter(i);
+            this.pyodide.runPython(`
+                ${param.getId()} = ${param.getValue()}
+            `);
+        }
+    }
+
+    _assignPythonLocalSymbols() {
+        for (var i = 0; i < this.libsbmlKinetics.getNumParameters(); i++) {
+            var param = this.libsbmlKinetics.getParameter(i).getId();
+            this.pyodide.runPython(`
+                ${param} = sympy.symbols("${param}")
+            `);
+        }
+        for (var i = 0; i < this.libsbmlKinetics.getNumLocalParameters(); i++) {
+            var param = this.libsbmlKinetics.getLocalParameter(i);
+            this.pyodide.runPython(`
+                ${param} = sympy.symbols("${param}")
+            `);
+        }
+    }
+
+    _assignOtherSpeciesVals(species, speciesList, val) {
+        speciesList.forEach(otherSpecies => {
+            if (otherSpecies !== species) {
+                this.pyodide.runPython(`
+                    ${otherSpecies} = ${val}
+                `);
+            }
+        });
+    }
+
+    _assignSpeciesSymbols(speciesList) {
+        speciesList.forEach(species => {
+            this.pyodide.runPython(`
+                ${species} = sympy.symbols("${species}")
+            `);
+        });
     }
 
     /**
@@ -511,7 +607,7 @@ class KineticLaw {
         return false;
     }
 
-    isMMcat(kinetics, kineticsSim, idsList, speciesInKineticLaw, parametersInKineticLaw, reactantList) {
+    isMMcat(kinetics, kineticsSim, idsList, speciesInKineticLaw, parametersInKineticLaw, reactantList, productList) {
         var eq = this._numeratorDenominator(kineticsSim, idsList);
         var flagFr = false;
         speciesInKineticLaw.forEach(species => {
@@ -520,7 +616,8 @@ class KineticLaw {
             }
         });
         if (flagFr) {
-            if (this._numSpeciesInKinetics(speciesInKineticLaw) == 2 && this._numOfRcts(reactantList) == 1) {
+            if (this._numSpeciesInKinetics(speciesInKineticLaw) == 2 && this._numOfRcts(reactantList) == 1
+                && !speciesInKineticLaw.some(item => productList.includes(item))) {
                 if (this._MMSingleSpecInNumerator(kinetics, idsList, parametersInKineticLaw, reactantList)) {
                     return true;
                 }
@@ -922,7 +1019,7 @@ class KineticLaw {
 
         if (!numerator.includes("+") && !numerator.includes("-")) {
             if (numerator.includes(species)) {
-                if ((!numerator.includes("pow(") && !numerator.includes("-1)")) || numerator.includes("**")) {
+                if ((numerator.includes("pow(") && !numerator.includes("-1)")) || numerator.includes("**")) {
                     flagNumerator = true;
                 }
             }
@@ -932,12 +1029,12 @@ class KineticLaw {
             var terms1 = terms[0];
             var terms2 = terms[1];
             if (terms1.includes(species) && !terms2.includes(species)) {
-                if ((!terms1.includes("pow(") && !terms1.includes("-1)")) || terms1.includes("**")) {
+                if ((terms1.includes("pow(") && !terms1.includes("-1)")) || terms1.includes("**")) {
                     flagDenominator = true;
                 }
             }
             if (terms2.includes(species) && !terms1.includes(species)) {
-                if ((!terms2.includes("pow(") && !terms2.includes("-1)")) || terms2.includes("**")) {
+                if ((terms2.includes("pow(") && !terms2.includes("-1)")) || terms2.includes("**")) {
                     flagDenominator = true;
                 }
             }
@@ -1103,3 +1200,5 @@ class KineticLaw {
         return this._augment(astNode, result, maxDepth);
     }
 }
+
+module.exports = KineticLaw;

@@ -44,6 +44,29 @@ class Reaction {
         } else {
             kineticStr = this.kineticLaw.formula;
         }
-        return `${reactantStr} -> ${productStr}; ${kineticStr}`;
+        var ret = `${reactantStr} -> ${productStr}; ${kineticStr}`;
+        if (!(this.kineticLaw.classificationCp["zerothOrder"]
+            || this.kineticLaw.classificationCp["powerTerms"]
+            || this.kineticLaw.classificationCp["UNDR"]
+            || this.kineticLaw.classificationCp["UNMO"]
+            || this.kineticLaw.classificationCp["BIDR"]
+            || this.kineticLaw.classificationCp["BIMO"]
+            || this.kineticLaw.classificationCp["MM"]
+            || this.kineticLaw.classificationCp["MMcat"]
+            || this.kineticLaw.classificationCp["Hill"]
+            || this.kineticLaw.classificationCp["Polynomial"]
+            )) {
+            ret += `\nWarning: Unrecognized rate law from the standard list.`;
+        }
+        if (this.kineticLaw.analysis["floatingSpecies"].length > 0) {
+            ret += `\nWarning: floating reactant: ${this.kineticLaw.analysis["floatingSpecies"].toString()}`;
+        }
+        if (this.kineticLaw.analysis["inconsistentProducts"].length > 0) {
+            ret += `\nWarning: irreversible reaction kinetic law contains products: ${this.kineticLaw.analysis["inconsistentProducts"].toString()}`;
+        }
+        if (this.kineticLaw.analysis["nonIncreasingSpecies"].length > 0) {
+            ret += `\nWarning: non increasing species: ${this.kineticLaw.analysis["nonIncreasingSpecies"].toString()}`;
+        }
+        return ret;
     }
 }
