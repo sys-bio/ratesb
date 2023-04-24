@@ -1,7 +1,7 @@
 /** Provides Information on SBML Kinetics Laws */
 
 class KineticLaw {
-    constructor( libsbmlModel, libsbmlReaction, libsbmlKinetics, reaction, functionDefinitions, pyodide, processSBML) {
+    constructor( libsbmlModel, libsbmlReaction, libsbmlKinetics, reaction, functionDefinitions, pyodide, processSBML, namingConvention) {
         this.libsbmlModel = libsbmlModel;
         this.libsbmlReaction = libsbmlReaction;
         this.pyodide = pyodide;
@@ -32,6 +32,7 @@ class KineticLaw {
         this.sympyFormula = this.expandedFormula.replaceAll("^", "**");
         this.classificationCp = {};
         this.analysis = {};
+        this.namingConvention = namingConvention;
         this.classify();
     }
 
@@ -49,7 +50,7 @@ class KineticLaw {
 
     classify() {
         var speciesInKineticLaw = [];
-        var parametersInKineticLaw = [];
+        var parametersInKineticLawOnly = [];
         var othersInKineticLaw = [];
         var idsList = [...new Set(this.symbols)];
         var i;
@@ -57,12 +58,12 @@ class KineticLaw {
             if (this.model.speciesList.includes(idsList[i])) {
                 speciesInKineticLaw.push(idsList[i]);
             } else if (this.model.parameterList.includes(idsList[i])) {
-                parametersInKineticLaw.push(idsList[i]);
+                parametersInKineticLawOnly.push(idsList[i]);
             } else {
                 othersInKineticLaw.push(idsList[i]);
             }
         }
-        parametersInKineticLaw = parametersInKineticLaw.concat(othersInKineticLaw);
+        var parametersInKineticLaw = parametersInKineticLawOnly.concat(othersInKineticLaw);
         if (this.reaction.reactantList.length != 0) {
             idsList = idsList.concat(this.reaction.reactantList);
         }
@@ -104,19 +105,18 @@ class KineticLaw {
         this.classificationCp["Polynomial"] = this.isPolynomial(kineticsSim, idsList, speciesInKineticLaw);
 
         console.log(this.classificationCp);
-        this.kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLaw, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList);
+        this.kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLaw, parametersInKineticLawOnly, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList);
     }
 
-    kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLaw, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList) {
-        var namingConventionCheck = true;
+    kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLaw, parametersInKineticLawOnly, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList) {
         this.assignPythonVals();
         this.analysis["floatingSpecies"] = this.checkFloatingSpecies(speciesInKineticLaw, reactantList);
         this.analysis["inconsistentProducts"] = this.checkIrreversibleProduct(speciesInKineticLaw, productList);
         this.analysis["nonIncreasingSpecies"] = this.checkNonIncreasingSpecies(speciesInKineticLaw, parametersInKineticLaw, reactantList, productList, kinetics);
-        if (namingConventionCheck) {
-            this.analysis["namingConvention"] = this.checkNamingConventions(speciesInKineticLaw, parametersInKineticLaw, reactantList, productList, kinetics);
+        if (this.namingConvention) {
+            this.analysis["namingConvention"] = this.checkNamingConventions(parametersInKineticLawOnly, kineticsSim, idsList);
         } else {
-            this.analysis["namingConvention"] = [];
+            this.analysis["namingConvention"] = {'k': [], 'v': []};
         }
         this.assignPythonSymbols();
     }
@@ -249,31 +249,79 @@ class KineticLaw {
         return nonIncreasingSpecies;
     }
 
-    checkNamingConventions() {
-        var ret = [];
+    checkNamingConventions(parametersInKineticLaw, kineticsSim, idsList) {
+        var ret = {'k': [], 'v': []};
         if (this.classificationCp["zerothOrder"]) {
-            
+            ret['k'] = this._checkSymbolsStartWith('k', parametersInKineticLaw);
         } else if (this.classificationCp["powerTerms"]) {
 
         } else if (this.classificationCp["UNDR"]) {
-
+            ret['k'] = this._checkSymbolsStartWith('k', parametersInKineticLaw);
         } else if (this.classificationCp["UNMO"]) {
-            
+            ret['k'] = this._checkSymbolsStartWith('k', parametersInKineticLaw);
         } else if (this.classificationCp["BIDR"]) {
-            
+            ret['k'] = this._checkSymbolsStartWith('k', parametersInKineticLaw);
         } else if (this.classificationCp["BIMO"]) {
-            
+            ret['k'] = this._checkSymbolsStartWith('k', parametersInKineticLaw);
         } else if (this.classificationCp["MM"]) {
-            
+            var eq = this._numeratorDenominator(kineticsSim, idsList);
+            var eq0 = [];
+            var eq1 = [];
+            parametersInKineticLaw.forEach(param => {
+                if (eq[0].includes(param)) {
+                    eq0.push(param);
+                } else if (eq[1].includes(param)) {
+                    eq1.push(param);
+                }
+            });
+            ret['v'] = this._checkSymbolsStartWith('v', eq0);
+            ret['k'] = this._checkSymbolsStartWith('k', eq1);
         } else if (this.classificationCp["MMcat"]) {
-            
+            var eq = this._numeratorDenominator(kineticsSim, idsList);
+            var eq0 = [];
+            var eq1 = [];
+            parametersInKineticLaw.forEach(param => {
+                if (eq[0].includes(param)) {
+                    eq0.push(param);
+                } else if (eq[1].includes(param)) {
+                    eq1.push(param);
+                }
+            });
+            ret['k'] = this._checkSymbolsStartWith('k', eq0);
+            ret['k'] = this._checkSymbolsStartWith('k', eq1);
         } else if (this.classificationCp["Hill"]) {
-
+            var eq = this._numeratorDenominator(kineticsSim, idsList);
+            var eq0 = [];
+            var eq1 = [];
+            parametersInKineticLaw.forEach(param => {
+                if (eq[0].includes(param)) {
+                    eq0.push(param);
+                } else if (eq[1].includes(param)) {
+                    eq1.push(param);
+                }
+            });
+            ret['k'] = this._checkSymbolsStartWith('k', eq1);
         } else if (this.classificationCp["Fraction"]) {
             
         } else if (this.classificationCp["Polynomial"]) {
             
         }
+        return ret;
+    }
+
+    /**
+     * check if symbols in the list start with given start
+     * @param {String} start 
+     * @param {[]} symbols 
+     * @returns {[]} list of symbols not starting with given start
+     */
+    _checkSymbolsStartWith(start, symbols) {
+        var ret = [];
+        symbols.forEach(symbol => {
+            if (!symbol.toLowerCase().startsWith(start)) {
+                ret.push(symbol);
+            }
+        });
         return ret;
     }
 

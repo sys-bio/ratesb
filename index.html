@@ -128,7 +128,8 @@
 
       // Try to create a new ProcessSBML object with the SBML string
       try {
-        SBMLProcessor = new ProcessSBML(sbmlResult, pyodide, lib);
+        var namingConvention = document.getElementById("namingConvention").checked;
+        SBMLProcessor = new ProcessSBML(sbmlResult, pyodide, lib, namingConvention);
         console.log(SBMLProcessor);
 
         // If successful, get the species, parameters, and reactions from the ProcessSBML object
@@ -179,7 +180,10 @@
 
   <button class = "btn btn-primary" id="CopyToClipboard" onclick="copytoclipboard()">Copy to Clipboard</button>
 
-  <h5>The SBML is:</h5>
+  <input type="checkbox" id="namingConvention" name="namingConvention" name="namingConvention">
+  <label for="namingConvention">Naming Convention Check</label><br>
+
+  <h5>Rate Law Analysis:</h5>
   <div class="form-group purple-border">
     <textarea class="form-control" id="sbml_output" style="font-size: 12px!important;" rows="20" height:250px !important;>
     </textarea>

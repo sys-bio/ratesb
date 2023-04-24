@@ -1,6 +1,6 @@
 /** Abstraction for a Reaction */
 class Reaction {
-    constructor( libsbmlModel, libsbmlReaction, functionDefinitions, pyodide, processSBML ) {
+    constructor( libsbmlModel, libsbmlReaction, functionDefinitions, pyodide, processSBML, namingConvention ) {
         this.reaction = libsbmlReaction;
         console.log(this.reaction)
         this.reactantList = [];
@@ -15,7 +15,8 @@ class Reaction {
             this.productList.push(product.getSpecies());
         }
         this.id = this.reaction.getId();
-        this.kineticLaw = new KineticLaw(libsbmlModel, libsbmlReaction, this.reaction.getKineticLaw(), this, functionDefinitions, pyodide, processSBML);
+        this.namingConvention = namingConvention;
+        this.kineticLaw = new KineticLaw(libsbmlModel, libsbmlReaction, this.reaction.getKineticLaw(), this, functionDefinitions, pyodide, processSBML, namingConvention);
     }
 
     getId() {
@@ -66,6 +67,12 @@ class Reaction {
         }
         if (this.kineticLaw.analysis["nonIncreasingSpecies"].length > 0) {
             ret += `\nWarning: non increasing species: ${this.kineticLaw.analysis["nonIncreasingSpecies"].toString()}`;
+        }
+        if (this.kineticLaw.analysis["namingConvention"]['k'].length > 0) {
+            ret += `\nWarning: elements should start with k: ${this.kineticLaw.analysis["namingConvention"]['k'].toString()}`;
+        }
+        if (this.kineticLaw.analysis["namingConvention"]['v'].length > 0) {
+            ret += `\nWarning: elements should start with v: ${this.kineticLaw.analysis["namingConvention"]['v'].toString()}`;
         }
         return ret;
     }
