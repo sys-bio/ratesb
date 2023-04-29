@@ -58,6 +58,26 @@
       console.log('Load libantimony error: ', err);
     }
 
+    // function toggleNightMode() {
+    //   const body = document.body;
+    //   if (body.classList.contains("night-mode")) {
+    //     body.classList.remove("night-mode");
+    //   } else {
+    //     body.classList.add("night-mode");
+    //   }
+    // }
+
+    function toggleNightMode() {
+      const nightModeToggle = document.getElementById("night-mode-toggle");
+      const body = document.body;
+      body.classList.toggle("night-mode");
+      if (body.classList.contains("night-mode")) {
+        nightModeToggle.innerText = "Light Mode";
+      } else {
+        nightModeToggle.innerText = "Night Mode";
+      }
+    }
+
     async function processFileInput() {
       const fileInput = document.querySelector("input[type=file]");
       if (fileInput.files.length === 0) {
@@ -192,7 +212,12 @@
 
 <body>
   <div class="container py-5">
-    <h1 class="text-center mb-4">RateSB</h1>
+    <div class="d-flex justify-content-center align-items-center mb-4">
+      <h1 class="mb-0">Local RateSB</h1>
+      <button id="night-mode-toggle" class="night-mode-switch ms-3" onclick="toggleNightMode()">
+        Night Mode
+      </button>
+    </div>
 
     <div class="mb-3">
       <label for="sbml_file" class="form-label">Select an SBML file:</label>

@@ -41,3 +41,48 @@ textarea {
   .error-message {
     background-color: #ff4d4d;
   }
+
+  /* Night mode */
+body.night-mode {
+    background-color: #1a1a1a;
+    color: #f8f9fa;
+  }
+  
+  .night-mode .container {
+    background-color: #333;
+    border-radius: 5px;
+    padding: 20px;
+  }
+  
+  .night-mode .output-container {
+    background-color: #333;
+  }
+
+  /* Night mode switch */
+.night-mode-switch {
+    display: inline-flex;
+    align-items: center;
+    background-color: #343a40;
+    color: #f8f9fa;
+    padding: 5px 10px;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    font-size: 0.9rem;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s, color 0.3s;
+  }
+  
+  .night-mode-switch:hover {
+    background-color: #495057;
+  }
+  
+  .night-mode .night-mode-switch {
+    background-color: #ffffff;
+    color: #343a40;
+  }
+  
+  .night-mode .night-mode-switch:hover {
+    background-color: #f8f9fa;
+  }
+  
