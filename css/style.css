@@ -10,5 +10,34 @@ textarea {
    .textareaOutput {
        white-space: pre-wrap;
    }
-   
-   
+
+
+   .output-container {
+    border: 1px solid #6c757d;
+    border-radius: 5px;
+    padding: 5px;
+    background-color: #f8f9fa;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  
+  .output-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .warning-message,
+  .error-message {
+    padding: 4px;
+    border-radius: 3px;
+    font-size: 12px;
+  }
+  
+  .warning-message {
+    background-color: #ffcc00;
+  }
+  
+  .error-message {
+    background-color: #ff4d4d;
+  }

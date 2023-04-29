@@ -1,3 +1,5 @@
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <noscript>Your browser does not support JavaScript!</noscript>
 
@@ -37,6 +39,11 @@
       `);
       return pyodide;
     }
+
+    function setLoading(loading) {
+      const loadingIcon = document.getElementById("loading-icon");
+      loadingIcon.style.display = loading ? "inline-block" : "none";
+    }
     
     var loadAntimonyString;
     var getSBMLString;
@@ -51,29 +58,24 @@
       console.log('Load libantimony error: ', err);
     }
 
-
-    function copytoclipboard() {
-      var copyText = document.getElementById("sbml_output");
-
-      // Select the text field
-      copyText.select();
-      copyText.setSelectionRange(0, 99999); // For mobile devices
-      // Copy the text inside the text field
-      navigator.clipboard.writeText(copyText.value);
-    }
-
-    // read from file input, support reading from '.xml', '.ant', '.txt'
-    async function readSBMLFile() {
+    async function processFileInput() {
+      const fileInput = document.querySelector("input[type=file]");
+      if (fileInput.files.length === 0) {
+        alert("Please select a file.");
+        return;
+      }
+      setLoading(true);
       const pyodide = await loadPyscriptPackages();
-      const [file] = document.querySelector("input[type=file]").files;
+
+      const [file] = fileInput.files;
       const fileReader = new FileReader();
 
       fileReader.addEventListener(
         "load",
         () => {
-        // this will then display a text file
-        const modelStr = fileReader.result;
-        changeSBML(modelStr, pyodide);
+          const modelStr = fileReader.result;
+          changeSBML(modelStr, pyodide);
+          setLoading(false);
         },
         false
       );
@@ -81,13 +83,6 @@
       if (file) {
         fileReader.readAsText(file);
       }
-    }
-
-    // read from text input box
-    async function readSBMLtext() {
-      const pyodide = await loadPyscriptPackages();
-      modelStr = document.getElementById("model_input").value;
-      changeSBML(modelStr, pyodide);
     }
 
     /**
@@ -113,7 +108,14 @@
         if (loadInt > 0) {
           sbmlResult = getSBMLString();
         } else {
-          document.getElementById("sbml_output").value = "Not valid Antimony!";
+          const outputBox = document.getElementById("sbml_output");
+          outputBox.innerHTML = "";
+
+          const errorMessage = document.createElement("div");
+          errorMessage.className = "error-message";
+          errorMessage.textContent = "Not valid Antimony!";
+
+          outputBox.appendChild(errorMessage);
           return;
         }
 
@@ -152,41 +154,67 @@
         }
 
         // Display the string in the HTML element with ID "sbml_output"
-        document.getElementById("sbml_output").value = ret;
+        const outputBox = document.getElementById("sbml_output");
+        outputBox.innerHTML = "";
+
+        // Split the ret string into lines
+        const lines = ret.split("\n");
+
+        // Iterate through the lines and create div elements for each line
+        lines.forEach((line) => {
+          if (line.trim() === "") return;
+
+          const messageDiv = document.createElement("div");
+
+          if (line.startsWith("Warning")) {
+            messageDiv.className = "warning-message";
+          } else if (line.startsWith("Error")) {
+            messageDiv.className = "error-message";
+          }
+
+          messageDiv.textContent = line;
+          outputBox.appendChild(messageDiv);
+        });
 
       } catch(err) {
-        // If an error occurs, display the error stack trace in the HTML element with ID "sbml_output"
-        document.getElementById("sbml_output").value = err.stack;
+        const outputBox = document.getElementById("sbml_output");
+        outputBox.innerHTML = "";
+
+        const errorMessage = document.createElement("div");
+        errorMessage.className = "error-message";
+        errorMessage.textContent = err.stack;
+
+        outputBox.appendChild(errorMessage);
       }
     }
   </script>
 </head>
 
 <body>
-  <py-config>
-  packages = [
-    "sympy",
-  ]
-  </py-config>
-  <label for="sbml_file">Select an SBML file: </label>
-  <input type="file" accept=".xml,.ant,.txt" id="sbml_file" name="SBML file" onchange="readSBMLFile()">
+  <div class="container py-5">
+    <h1 class="text-center mb-4">RateSB</h1>
 
-  <div class="form-group purple-border">
-    <h5>Type your model here:</h5>
-    <textarea class="form-control" id="model_input" rows="8"></textarea>
+    <div class="mb-3">
+      <label for="sbml_file" class="form-label">Select an SBML file:</label>
+      <input type="file" accept=".xml,.ant,.txt" id="sbml_file" name="SBML file" class="form-control">
+    </div>
+
+    <div class="mb-3">
+      <button id="ClickMe" class="btn btn-primary" onclick="processFileInput()">Generate SBML</button>
+    </div>
+
+    <div class="mb-3">
+      <input type="checkbox" id="namingConvention" name="namingConvention">
+      <label for="namingConvention">Naming Convention Check</label>
+    </div>
+
+    <h5>Rate Law Analysis:</h5>
+    <div class="spinner-border text-primary" role="status" id="loading-icon" style="display: none;">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+    <div class="output-container">
+      <div id="sbml_output" class="output-box"></div>
+    </div>
   </div>
-
-  <button id="ClickMe" class = "btn btn-primary" onclick="readSBMLtext()">Generate SBML</button>
-
-  <button class = "btn btn-primary" id="CopyToClipboard" onclick="copytoclipboard()">Copy to Clipboard</button>
-
-  <input type="checkbox" id="namingConvention" name="namingConvention" name="namingConvention">
-  <label for="namingConvention">Naming Convention Check</label><br>
-
-  <h5>Rate Law Analysis:</h5>
-  <div class="form-group purple-border">
-    <textarea class="form-control" id="sbml_output" style="font-size: 12px!important;" rows="20" height:250px !important;>
-    </textarea>
-  </div>
-
 </body>
+</html>
