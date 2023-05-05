@@ -10,6 +10,7 @@
   <script defer src="https://pyscript.net/latest/pyscript.js"></script>
   <link rel="stylesheet" href="css/style.css" />
   <link rel = 'stylesheet' href = "https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-KyZXEAg3QhqLMpG8r+Knujsl7/1L_dstPt3HV5HzF6Gvk/e3s2lfoUJklFJ1zla2" crossorigin="anonymous">
   
   <script src="https://cdn.jsdelivr.net/pyodide/v0.22.1/full/pyodide.js"></script>
 
@@ -24,6 +25,9 @@
   <script src="sbml/Reaction.js" type="text/javascript"></script>
   <script src="sbml/KineticLaw.js" type="text/javascript"></script>
   <script src="sbml/constants.js" type="text/javascript"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js"></script>
 
   <script type="text/javascript">
     const lib = libsbml();
@@ -45,16 +49,46 @@
       loadingIcon.style.display = loading ? "inline-block" : "none";
     }
     
-    var loadAntimonyString;
-    var getSBMLString;
-
+    var antCode;
+    var sbmlCode;
+    var sbmlResult = 'None';
+    var antResult = 'None';
+    var loadAntimonyString; // libantimony function
+    var loadString; // "
+    var loadSBMLString; // "
+    var getSBMLString; // "
+    var getAntimonyString; // "
+    var getCompSBMLString; // "
+    var clearPreviousLoads; // "
+    var getLastError; // "
+    var getWarnings; // "
+    var getSBMLInfoMessages;// "
+    var getSBMLWarnings; // "
+    var freeAll; // "
+    var free; // emscripten function
+    var jsAllocateUTF8; // "
+    console.log(libantimony);
+    // Load library functions (asynchronous call):
     try {
       libantimony().then((libantimony) => {
-      loadAntimonyString = libantimony.cwrap('loadAntimonyString', 'number', ['string']);
+      // Format: libantimony.cwrap( function name, return type, input param array of types).
+      loadString = libantimony.cwrap('loadString', 'number', ['number']);
+      loadAntimonyString = libantimony.cwrap('loadAntimonyString', 'number', ['number']);
+      loadSBMLString = libantimony.cwrap('loadSBMLString', 'number', ['number']);
       getSBMLString = libantimony.cwrap('getSBMLString', 'string', ['null']);
+      getAntimonyString = libantimony.cwrap('getAntimonyString', 'string', ['null']);
+      getCompSBMLString = libantimony.cwrap('getCompSBMLString', 'string', ['string']);
+      clearPreviousLoads = libantimony.cwrap('clearPreviousLoads', 'null', ['null']);
+      getLastError = libantimony.cwrap('getLastError', 'string', ['null']);
+      getWarnings = libantimony.cwrap('getWarnings', 'string', ['null']);
+      getSBMLInfoMessages = libantimony.cwrap('getSBMLInfoMessages', 'string', ['string']);
+      getSBMLWarnings = libantimony.cwrap('getSBMLWarnings', 'string', ['string']);
+      freeAll = libantimony.cwrap('freeAll', 'null', ['null']);
+      jsFree = (strPtr) => libantimony._free(strPtr);
+      jsAllocateUTF8 = (newStr) => libantimony.allocateUTF8(newStr);
       });
     }
-    catch(err) {
+    catch (err) {
       console.log('Load libantimony error: ', err);
     }
 
@@ -79,10 +113,19 @@
     }
 
     async function processFileInput() {
+      clearPreviousLoads();
       const fileInput = document.querySelector("input[type=file]");
       if (fileInput.files.length === 0) {
-        alert("Please select a file.");
-        return;
+        const antStr = document.getElementById("bioModelInput").value;
+        if (antStr.length > 0) {
+          setLoading(true);
+          processTextInput();
+          setLoading(false);
+          return;
+        } else {
+          alert("Please select a file.");
+          return;
+        }
       }
       setLoading(true);
       const pyodide = await loadPyscriptPackages();
@@ -94,7 +137,7 @@
         "load",
         () => {
           const modelStr = fileReader.result;
-          changeSBML(modelStr, pyodide);
+          changeSBML(modelStr, pyodide, true);
           setLoading(false);
         },
         false
@@ -105,30 +148,38 @@
       }
     }
 
+    async function processTextInput() {
+      const modelStr = document.getElementById("bioModelInput").value;
+      const pyodide = await loadPyscriptPackages();
+      changeSBML(modelStr, pyodide, false);
+    }
+
     /**
      * Converts a model string to SBML format and outputs information about the model. 
      *
      * @param {string} modelStr - The model string to be processed, in Antimony or SBML format.
      * @param {object} pyodide - A Pyodide object used to create the ProcessSBML object.
      */
-    function changeSBML(modelStr, pyodide) {
-
+    function changeSBML(modelStr, pyodide, changeTextInput) {
       // Declare variables
       var sbmlResult;
       var SBMLProcessor;
 
       // Check if the model string contains the <sbml tag
       if (!modelStr.includes("<sbml")) {
-
         // If not, load the model string into Antimony
-        var loadInt = loadAntimonyString(modelStr);
+        var ptrAntCode = jsAllocateUTF8(modelStr)
+        var loadInt = loadAntimonyString(ptrAntCode);
         console.log("processAntimony: int returned: ", loadInt);
 
         // If the model loaded successfully, get the SBML string
         if (loadInt > 0) {
           sbmlResult = getSBMLString();
+          if (changeTextInput) {
+            document.getElementById("bioModelInput").value = modelStr;
+          }
         } else {
-          const outputBox = document.getElementById("sbml_output");
+          const outputBox = document.getElementById("sbml_output").value;
           outputBox.innerHTML = "";
 
           const errorMessage = document.createElement("div");
@@ -136,23 +187,31 @@
           errorMessage.textContent = "Not valid Antimony!";
 
           outputBox.appendChild(errorMessage);
+          jsFree(ptrAntCode);
           return;
         }
+        jsFree(ptrAntCode);
 
       } else {
         // If the model string already contains the <sbml tag, use it as is
         sbmlResult = modelStr;
+        if (changeTextInput) {
+          var ptrSBMLCode = jsAllocateUTF8(modelStr);
+          var loadInt = loadSBMLString(ptrSBMLCode);
+          if (loadInt > 0) {
+            document.getElementById("bioModelInput").value = getAntimonyString();
+          } else {
+            var errStr = getLastError();
+            window.alert(errStr);
+          }
+          jsFree(ptrSBMLCode);
+        } 
       }
-
-      // Output to console to check lib and libantimony()
-      console.log(lib);
-      console.log(libantimony());
 
       // Try to create a new ProcessSBML object with the SBML string
       try {
         var namingConvention = document.getElementById("namingConvention").checked;
         SBMLProcessor = new ProcessSBML(sbmlResult, pyodide, lib, namingConvention);
-        console.log(SBMLProcessor);
 
         // If successful, get the species, parameters, and reactions from the ProcessSBML object
         const species = SBMLProcessor.getSpeciesList();
@@ -207,38 +266,80 @@
         outputBox.appendChild(errorMessage);
       }
     }
+
+    async function copyToClipboard() {
+      const outputElement = document.getElementById("sbml_output");
+      try {
+        await navigator.clipboard.writeText(outputElement.innerText);
+        // alert("Output copied to clipboard!");
+      } catch (err) {
+        console.error("Error copying text: ", err);
+        alert("Error copying output to clipboard. Please try again.");
+      }
+    }
   </script>
 </head>
 
 <body>
   <div class="container py-5">
     <div class="d-flex justify-content-center align-items-center mb-4">
-      <h1 class="mb-0">Local RateSB</h1>
+      <h1 class="mb-0">RateSB</h1>
       <button id="night-mode-toggle" class="night-mode-switch ms-3" onclick="toggleNightMode()">
         Night Mode
       </button>
     </div>
+    <p class="text-center">Accepts SBML and Antimony files, or paste Antimony model in the text box.
+      <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#infoModal">Info</button>
+    </p>
 
-    <div class="mb-3">
-      <label for="sbml_file" class="form-label">Select an SBML file:</label>
-      <input type="file" accept=".xml,.ant,.txt" id="sbml_file" name="SBML file" class="form-control">
+    <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="infoModalLabel">Website Rules</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>If a file is given, the Antimony version (if the given input is in SBML, it will be converted into Antimony) will be available in the text input box on the left.</p>
+            <p>If no file is given, then RateSB will look for the text input and analyze that instead.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="mb-3">
-      <button id="ClickMe" class="btn btn-primary" onclick="processFileInput()">Generate SBML</button>
-    </div>
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="sbml_file" class="form-label">Select a file (.xml, .ant, .txt):</label>
+          <input type="file" accept=".xml,.ant,.txt" id="sbml_file" name="SBML file" class="form-control">
+        </div>
 
-    <div class="mb-3">
-      <input type="checkbox" id="namingConvention" name="namingConvention">
-      <label for="namingConvention">Naming Convention Check</label>
-    </div>
+        <div class="mb-3">
+          <textarea id="bioModelInput" class="form-control" rows="20" placeholder="[Antimony code here.]"></textarea>
+        </div>
 
-    <h5>Rate Law Analysis:</h5>
-    <div class="spinner-border text-primary" role="status" id="loading-icon" style="display: none;">
-      <span class="visually-hidden">Loading...</span>
-    </div>
-    <div class="output-container">
-      <div id="sbml_output" class="output-box"></div>
+        <div class="mb-3">
+          <button id="ClickMe" class="btn btn-primary" onclick="processFileInput()">Analyze Model</button>
+        </div>
+
+        <div class="mb-3">
+          <input type="checkbox" id="namingConvention" name="namingConvention">
+          <label for="namingConvention">Naming Convention Check</label>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <h5>Rate Law Analysis:</h5>
+        <div class="spinner-border text-primary" role="status" id="loading-icon" style="display: none;">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <div class="output-container">
+          <div id="sbml_output" class="output-box"></div>
+        </div>
+        <button id="copyToClipboard" class="btn btn-secondary mt-3" onclick="copyToClipboard()">Copy to Clipboard</button>
+      </div>
     </div>
   </div>
 </body>
