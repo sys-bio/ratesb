@@ -33,7 +33,12 @@ class KineticLaw {
         this.classificationCp = {};
         this.analysis = {};
         this.namingConvention = namingConvention;
-        this.classify();
+        if (this.formula.replace(/\s/g, '').length) {
+            this.analysis["emptyRateLaw"] = false;
+            this.classify();
+        } else {
+            this.analysis["emptyRateLaw"] = true;
+        }
     }
 
     toString() {
@@ -87,25 +92,29 @@ class KineticLaw {
             js.kineticsSim = kineticsSim
         `);
         console.log(kineticsSim);
-
-        var reactantList = this.reaction.reactantList;
-        var productList = this.reaction.productList;
-        var kinetics = this.expandedFormula;
-
-        this.classificationCp["zerothOrder"] = this.isZerothOrder(speciesInKineticLaw);
-        this.classificationCp["powerTerms"] = this.isPowerTerms(kinetics, kineticsSim);
-        this.classificationCp["UNDR"] = this.isUNDR(reactantList, kinetics, kineticsSim, speciesInKineticLaw, idsList);
-        this.classificationCp["UNMO"] = this.isUNMO(reactantList, kinetics, kineticsSim, speciesInKineticLaw, idsList);
-        this.classificationCp["BIDR"] = this.isBIDR(reactantList, productList, kinetics, kineticsSim, speciesInKineticLaw, idsList);
-        this.classificationCp["BIMO"] = this.isBIMO(reactantList, productList, kinetics, kineticsSim, speciesInKineticLaw, idsList);
-        this.classificationCp["MM"] = this.isMM(kinetics, kineticsSim, idsList, speciesInKineticLaw, parametersInKineticLaw, reactantList);
-        this.classificationCp["MMcat"] = this.isMMcat(kinetics, kineticsSim, idsList, speciesInKineticLaw, parametersInKineticLaw, reactantList, productList);
-        this.classificationCp["Hill"] = this.isHill(kineticsSim, idsList, speciesInKineticLaw);
-        this.classificationCp["Fraction"] = this.isFraction(kineticsSim, idsList, speciesInKineticLaw);
-        this.classificationCp["Polynomial"] = this.isPolynomial(kineticsSim, idsList, speciesInKineticLaw);
-
-        console.log(this.classificationCp);
-        this.kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLaw, parametersInKineticLawOnly, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList);
+        if ((typeof kineticsSim) !== "number") {
+            this.analysis["pureNumber"] = false;
+            var reactantList = this.reaction.reactantList;
+            var productList = this.reaction.productList;
+            var kinetics = this.expandedFormula;
+    
+            this.classificationCp["zerothOrder"] = this.isZerothOrder(speciesInKineticLaw);
+            this.classificationCp["powerTerms"] = this.isPowerTerms(kinetics, kineticsSim);
+            this.classificationCp["UNDR"] = this.isUNDR(reactantList, kinetics, kineticsSim, speciesInKineticLaw, idsList);
+            this.classificationCp["UNMO"] = this.isUNMO(reactantList, kinetics, kineticsSim, speciesInKineticLaw, idsList);
+            this.classificationCp["BIDR"] = this.isBIDR(reactantList, productList, kinetics, kineticsSim, speciesInKineticLaw, idsList);
+            this.classificationCp["BIMO"] = this.isBIMO(reactantList, productList, kinetics, kineticsSim, speciesInKineticLaw, idsList);
+            this.classificationCp["MM"] = this.isMM(kinetics, kineticsSim, idsList, speciesInKineticLaw, parametersInKineticLaw, reactantList);
+            this.classificationCp["MMcat"] = this.isMMcat(kinetics, kineticsSim, idsList, speciesInKineticLaw, parametersInKineticLaw, reactantList, productList);
+            this.classificationCp["Hill"] = this.isHill(kineticsSim, idsList, speciesInKineticLaw);
+            this.classificationCp["Fraction"] = this.isFraction(kineticsSim, idsList, speciesInKineticLaw);
+            this.classificationCp["Polynomial"] = this.isPolynomial(kineticsSim, idsList, speciesInKineticLaw);
+    
+            console.log(this.classificationCp);
+            this.kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLaw, parametersInKineticLawOnly, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList);
+        } else {
+            this.analysis["pureNumber"] = true;
+        }
     }
 
     kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLaw, parametersInKineticLawOnly, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList) {
@@ -117,6 +126,11 @@ class KineticLaw {
             this.analysis["namingConvention"] = this.checkNamingConventions(parametersInKineticLawOnly, kineticsSim, idsList);
         } else {
             this.analysis["namingConvention"] = {'k': [], 'v': []};
+        }
+        if (this.formattingConvention) {
+            this.analysis["formattingConvention"] = this.checkFormattingConventions();
+        } else {
+            this.analysis["formattingConvention"] = null;
         }
         this.assignPythonSymbols();
     }
@@ -308,6 +322,8 @@ class KineticLaw {
         }
         return ret;
     }
+
+    checkFormattingConventions(parameter)
 
     /**
      * check if symbols in the list start with given start

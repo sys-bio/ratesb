@@ -46,33 +46,46 @@ class Reaction {
             kineticStr = this.kineticLaw.formula;
         }
         var ret = `${reactantStr} -> ${productStr}; ${kineticStr}`;
-        if (!(this.kineticLaw.classificationCp["zerothOrder"]
-            || this.kineticLaw.classificationCp["powerTerms"]
-            || this.kineticLaw.classificationCp["UNDR"]
-            || this.kineticLaw.classificationCp["UNMO"]
-            || this.kineticLaw.classificationCp["BIDR"]
-            || this.kineticLaw.classificationCp["BIMO"]
-            || this.kineticLaw.classificationCp["MM"]
-            || this.kineticLaw.classificationCp["MMcat"]
-            || this.kineticLaw.classificationCp["Hill"]
-            || this.kineticLaw.classificationCp["Polynomial"]
+        if (kineticLaw.analysis["emptyRateLaw"]) {
+            ret += "\nError E001: No Rate Law entered";
+        } else if (kineticLaw.analysis["pureNumber"]) {
+            ret += "\nWarning W001: Rate law contains only number";
+        } else {
+            if (kineticLaw.analysis["floatingSpecies"].length > 0) {
+                ret += `\nError E002: Floating reactant: ${kineticLaw.analysis["floatingSpecies"].toString()}`;
+            }
+            if (!(
+                kineticLaw.classificationCp["zerothOrder"] ||
+                kineticLaw.classificationCp["powerTerms"] ||
+                kineticLaw.classificationCp["UNDR"] ||
+                kineticLaw.classificationCp["UNMO"] ||
+                kineticLaw.classificationCp["BIDR"] ||
+                kineticLaw.classificationCp["BIMO"] ||
+                kineticLaw.classificationCp["MM"] ||
+                kineticLaw.classificationCp["MMcat"] ||
+                kineticLaw.classificationCp["Hill"] ||
+                kineticLaw.classificationCp["Polynomial"]
             )) {
-            ret += `\nWarning: Unrecognized rate law from the standard list.`;
-        }
-        if (this.kineticLaw.analysis["floatingSpecies"].length > 0) {
-            ret += `\nWarning: floating reactant: ${this.kineticLaw.analysis["floatingSpecies"].toString()}`;
-        }
-        if (this.kineticLaw.analysis["inconsistentProducts"].length > 0) {
-            ret += `\nWarning: irreversible reaction kinetic law contains products: ${this.kineticLaw.analysis["inconsistentProducts"].toString()}`;
-        }
-        if (this.kineticLaw.analysis["nonIncreasingSpecies"].length > 0) {
-            ret += `\nWarning: non increasing species: ${this.kineticLaw.analysis["nonIncreasingSpecies"].toString()}`;
-        }
-        if (this.kineticLaw.analysis["namingConvention"]['k'].length > 0) {
-            ret += `\nWarning: elements should start with k: ${this.kineticLaw.analysis["namingConvention"]['k'].toString()}`;
-        }
-        if (this.kineticLaw.analysis["namingConvention"]['v'].length > 0) {
-            ret += `\nWarning: elements should start with v: ${this.kineticLaw.analysis["namingConvention"]['v'].toString()}`;
+                ret += "\nWarning W002: Unrecognized rate law from the standard list.";
+            }
+            if (kineticLaw.analysis["inconsistentProducts"].length > 0) {
+                ret += `\nWarning W004: Irreversible reaction kinetic law contains products: ${kineticLaw.analysis["inconsistentProducts"].toString()}`;
+            }
+            if (kineticLaw.analysis["nonIncreasingSpecies"].length > 0) {
+                ret += `\nWarning W005: Non increasing species: ${kineticLaw.analysis["nonIncreasingSpecies"].toString()}`;
+            }
+            if (kineticLaw.analysis["namingConvention"]['k'].length > 0) {
+                ret += `\nWarning W006: We recommend that these parameters start with 'k': ${kineticLaw.analysis["namingConvention"]['k'].toString()}`;
+            }
+            if (kineticLaw.analysis["namingConvention"]['v'].length > 0) {
+                ret += `\nWarning W007: We recommend that these parameters start with 'v': ${kineticLaw.analysis["namingConvention"]['v'].toString()}`;
+            }
+            if (kineticLaw.analysis["formattingConvention"] == 1) {
+                ret += "\nWarning W008: Formatting convention not followed (compartment before parameters before species).";
+            }
+            if (kineticLaw.analysis["formattingConvention"] == 2) {
+                ret += "\nWarning W009: Elements of the same type should be ordered alphabetically.";
+            }
         }
         return ret;
     }

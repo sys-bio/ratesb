@@ -291,6 +291,7 @@
     </div>
     <p class="text-center">Accepts SBML and Antimony files, or paste Antimony model in the text box.
       <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#infoModal">Info</button>
+      <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#errorCodesModal">View Error Codes</button>
     </p>
 
     <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
@@ -303,6 +304,37 @@
           <div class="modal-body">
             <p>If a file is given, the Antimony version (if the given input is in SBML, it will be converted into Antimony) will be available in the text input box on the left.</p>
             <p>If no file is given, then RateSB will look for the text input and analyze that instead.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="errorCodesModal" tabindex="-1" aria-labelledby="errorCodesModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="errorCodesModalLabel">Error and Warning Codes</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <!-- Error code explanations -->
+            <h5 style="background-color:#ff4d4d;">Error Codes:</h5>
+            <p><strong>E001:</strong> No Rate Law entered<br> - The rate law is missing for the given reaction. Please provide a rate law to proceed.</p>
+            <p><strong>E002:</strong> Floating reactant<br> - The reaction contains floating reactants, which are not part of any rate law expression. Please ensure all reactants are included in the rate law expression.</p>
+          
+            <!-- Warning code explanations -->
+            <h5 style="background-color:#ffcc00;">Warning Codes:</h5>
+            <p><strong>W001:</strong> Rate law contains only number<br> - The rate law consists of only a numeric value. This is usually not a valid rate law for a reaction.</p>
+            <p><strong>W002:</strong> Unrecognized rate law from the standard list<br> - The rate law provided does not match any of the recognized standard rate laws. Please verify the rate law and make sure it is in a supported format.</p>
+            <p><strong>W004:</strong> Irreversible reaction kinetic law contains products<br> - The rate law for an irreversible reaction should not include products. Please verify the rate law and adjust accordingly.</p>
+            <p><strong>W005:</strong> Non-increasing species<br> - The rate law contains species that do not increase during the reaction. This could indicate an issue with the reaction or rate law. Please review the reaction and rate law.</p>
+            <p><strong>W006:</strong> We recommend that these parameters start with 'k'<br> - Certain parameters in the rate law are not following the recommended naming convention (starting with 'k'). Consider renaming these parameters to improve readability.</p>
+            <p><strong>W007:</strong> We recommend that these parameters start with 'v'<br> - Certain parameters in the rate law are not following the recommended naming convention (starting with 'v'). Consider renaming these parameters to improve readability.</p>
+            <p><strong>W008:</strong> Formatting convention not followed (compartment before parameters before species)<br> - The rate law does not follow the recommended formatting convention, which suggests placing compartments before parameters and species. Adjust the rate law to adhere to this convention for better readability and consistency.</p>
+            <p><strong>W009:</strong> Elements of the same type should be ordered alphabetically<br> - The elements within the rate law are not ordered alphabetically. Reordering the elements can improve readability and consistency.</p>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>

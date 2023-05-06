@@ -1,0 +1,36 @@
+Error and Warning Codes
+
+Error Codes:
+
+E001: No Rate Law entered!
+  - The rate law is missing for the given reaction. Please provide a rate law to proceed.
+
+Warning Codes:
+
+W001: Rate law contains only number!
+  - The rate law consists of only a numeric value. This is usually not a valid rate law for a reaction.
+
+W002: Unrecognized rate law from the standard list.
+  - The rate law provided does not match any of the recognized standard rate laws. Please verify the rate law and make sure it is in a supported format.
+
+W003: Floating reactant
+
+The reaction contains floating reactants, which are not part of any rate law expression. Please ensure all reactants are included in the rate law expression.
+W004: Irreversible reaction kinetic law contains products
+
+The rate law for an irreversible reaction should not include products. Please verify the rate law and adjust accordingly.
+W005: Non-increasing species
+
+The rate law contains species that do not increase during the reaction. This could indicate an issue with the reaction or rate law. Please review the reaction and rate law.
+W006: We recommend that these parameters start with 'k'
+
+Certain parameters in the rate law are not following the recommended naming convention (starting with 'k'). Consider renaming these parameters to improve readability.
+W007: We recommend that these parameters start with 'v'
+
+Certain parameters in the rate law are not following the recommended naming convention (starting with 'v'). Consider renaming these parameters to improve readability.
+W008: Formatting convention not followed (compartment before parameters before species)
+
+The rate law does not follow the recommended formatting convention, which suggests placing compartments before parameters and species. Adjust the rate law to adhere to this convention for better readability and consistency.
+W009: Elements of the same type should be ordered alphabetically
+
+The elements within the rate law are not ordered alphabetically. Reordering the elements can improve readability and consistency.
