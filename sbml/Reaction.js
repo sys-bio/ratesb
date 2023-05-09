@@ -1,6 +1,6 @@
 /** Abstraction for a Reaction */
 class Reaction {
-    constructor( libsbmlModel, libsbmlReaction, functionDefinitions, pyodide, processSBML, namingConvention ) {
+    constructor( libsbmlModel, libsbmlReaction, functionDefinitions, pyodide, processSBML, namingConvention, formattingConvention ) {
         this.reaction = libsbmlReaction;
         console.log(this.reaction)
         this.reactantList = [];
@@ -16,7 +16,8 @@ class Reaction {
         }
         this.id = this.reaction.getId();
         this.namingConvention = namingConvention;
-        this.kineticLaw = new KineticLaw(libsbmlModel, libsbmlReaction, this.reaction.getKineticLaw(), this, functionDefinitions, pyodide, processSBML, namingConvention);
+        this.formattingConvention = formattingConvention;
+        this.kineticLaw = new KineticLaw(libsbmlModel, libsbmlReaction, this.reaction.getKineticLaw(), this, functionDefinitions, pyodide, processSBML, namingConvention, formattingConvention);
     }
 
     getId() {
@@ -46,45 +47,71 @@ class Reaction {
             kineticStr = this.kineticLaw.formula;
         }
         var ret = `${reactantStr} -> ${productStr}; ${kineticStr}`;
-        if (kineticLaw.analysis["emptyRateLaw"]) {
+        if (this.kineticLaw.analysis["emptyRateLaw"]) {
             ret += "\nError E001: No Rate Law entered";
-        } else if (kineticLaw.analysis["pureNumber"]) {
+        } else if (this.kineticLaw.analysis["pureNumber"]) {
             ret += "\nWarning W001: Rate law contains only number";
         } else {
-            if (kineticLaw.analysis["floatingSpecies"].length > 0) {
-                ret += `\nError E002: Floating reactant: ${kineticLaw.analysis["floatingSpecies"].toString()}`;
+            if (this.kineticLaw.analysis["floatingSpecies"].length > 0) {
+                ret += `\nError E002: Floating reactant: ${this.kineticLaw.analysis["floatingSpecies"].toString()}`;
             }
             if (!(
-                kineticLaw.classificationCp["zerothOrder"] ||
-                kineticLaw.classificationCp["powerTerms"] ||
-                kineticLaw.classificationCp["UNDR"] ||
-                kineticLaw.classificationCp["UNMO"] ||
-                kineticLaw.classificationCp["BIDR"] ||
-                kineticLaw.classificationCp["BIMO"] ||
-                kineticLaw.classificationCp["MM"] ||
-                kineticLaw.classificationCp["MMcat"] ||
-                kineticLaw.classificationCp["Hill"] ||
-                kineticLaw.classificationCp["Polynomial"]
+                this.kineticLaw.classificationCp["zerothOrder"] ||
+                this.kineticLaw.classificationCp["powerTerms"] ||
+                this.kineticLaw.classificationCp["UNDR"] ||
+                this.kineticLaw.classificationCp["UNMO"] ||
+                this.kineticLaw.classificationCp["BIDR"] ||
+                this.kineticLaw.classificationCp["BIMO"] ||
+                this.kineticLaw.classificationCp["MM"] ||
+                this.kineticLaw.classificationCp["MMcat"] ||
+                this.kineticLaw.classificationCp["Hill"] ||
+                this.kineticLaw.classificationCp["Polynomial"]
             )) {
                 ret += "\nWarning W002: Unrecognized rate law from the standard list.";
             }
-            if (kineticLaw.analysis["inconsistentProducts"].length > 0) {
-                ret += `\nWarning W004: Irreversible reaction kinetic law contains products: ${kineticLaw.analysis["inconsistentProducts"].toString()}`;
+            if (this.kineticLaw.analysis["inconsistentProducts"].length > 0) {
+                ret += `\nWarning W003: Irreversible reaction kinetic law contains products: ${this.kineticLaw.analysis["inconsistentProducts"].toString()}`;
             }
-            if (kineticLaw.analysis["nonIncreasingSpecies"].length > 0) {
-                ret += `\nWarning W005: Non increasing species: ${kineticLaw.analysis["nonIncreasingSpecies"].toString()}`;
+            if (this.kineticLaw.analysis["nonIncreasingSpecies"].length > 0) {
+                ret += `\nWarning W004: Non increasing species: ${kineticLaw.analysis["nonIncreasingSpecies"].toString()}`;
             }
-            if (kineticLaw.analysis["namingConvention"]['k'].length > 0) {
-                ret += `\nWarning W006: We recommend that these parameters start with 'k': ${kineticLaw.analysis["namingConvention"]['k'].toString()}`;
+            if (this.kineticLaw.analysis["namingConvention"]['k'].length > 0) {
+                ret += `\nWarning W005: We recommend that these parameters start with 'k': ${this.kineticLaw.analysis["namingConvention"]['k'].toString()}`;
             }
-            if (kineticLaw.analysis["namingConvention"]['v'].length > 0) {
-                ret += `\nWarning W007: We recommend that these parameters start with 'v': ${kineticLaw.analysis["namingConvention"]['v'].toString()}`;
+            if (this.kineticLaw.analysis["namingConvention"]['v'].length > 0) {
+                ret += `\nWarning W006: We recommend that these parameters start with 'v': ${this.kineticLaw.analysis["namingConvention"]['v'].toString()}`;
             }
-            if (kineticLaw.analysis["formattingConvention"] == 1) {
-                ret += "\nWarning W008: Formatting convention not followed (compartment before parameters before species).";
-            }
-            if (kineticLaw.analysis["formattingConvention"] == 2) {
-                ret += "\nWarning W009: Elements of the same type should be ordered alphabetically.";
+            switch (this.kineticLaw.analysis["formattingConvention"]) {
+                case 0:
+                    // Formatted correctly, no warning needed
+                    break;
+                case 1:
+                    ret += "\nWarning W007: Elements of the same type should be ordered alphabetically.";
+                    break;
+                case 2:
+                    ret += "\nWarning W008: Formatting convention not followed (compartment before parameters before species).";
+                    break;
+                case 3:
+                    ret += "\nWarning W009: Denominator not in alphabetical order.";
+                    break;
+                case 4:
+                    ret += "\nWarning W010: Numerator and denominator not in alphabetical order.";
+                    break;
+                case 5:
+                    ret += "\nWarning W011: Numerator convention not followed and denominator not in alphabetical order.";
+                    break;
+                case 6:
+                    ret += "\nWarning W012: Denominator convention not followed.";
+                    break;
+                case 7:
+                    ret += "\nWarning W013: Numerator not in alphabetical order and denominator convention not followed.";
+                    break;
+                case 8:
+                    ret += "\nWarning W014: Numerator and denominator convention not followed.";
+                    break;
+                default:
+                    // Unhandled case, add an appropriate message if needed
+                    break;
             }
         }
         return ret;

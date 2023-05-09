@@ -1,7 +1,7 @@
 /** Provides Information on SBML Kinetics Laws */
 
 class KineticLaw {
-    constructor( libsbmlModel, libsbmlReaction, libsbmlKinetics, reaction, functionDefinitions, pyodide, processSBML, namingConvention) {
+    constructor( libsbmlModel, libsbmlReaction, libsbmlKinetics, reaction, functionDefinitions, pyodide, processSBML, namingConvention, formattingConvention) {
         this.libsbmlModel = libsbmlModel;
         this.libsbmlReaction = libsbmlReaction;
         this.pyodide = pyodide;
@@ -33,6 +33,7 @@ class KineticLaw {
         this.classificationCp = {};
         this.analysis = {};
         this.namingConvention = namingConvention;
+        this.formattingConvention = formattingConvention;
         if (this.formula.replace(/\s/g, '').length) {
             this.analysis["emptyRateLaw"] = false;
             this.classify();
@@ -56,6 +57,7 @@ class KineticLaw {
     classify() {
         var speciesInKineticLaw = [];
         var parametersInKineticLawOnly = [];
+        var compartmentInKineticLaw = [];
         var othersInKineticLaw = [];
         var idsList = [...new Set(this.symbols)];
         var i;
@@ -64,6 +66,9 @@ class KineticLaw {
                 speciesInKineticLaw.push(idsList[i]);
             } else if (this.model.parameterList.includes(idsList[i])) {
                 parametersInKineticLawOnly.push(idsList[i]);
+            } else if (this.model.compartmentList.includes(idsList[i])) {
+                compartmentInKineticLaw.push(idsList[i]);
+                othersInKineticLaw.push(idsList[i]);
             } else {
                 othersInKineticLaw.push(idsList[i]);
             }
@@ -111,13 +116,13 @@ class KineticLaw {
             this.classificationCp["Polynomial"] = this.isPolynomial(kineticsSim, idsList, speciesInKineticLaw);
     
             console.log(this.classificationCp);
-            this.kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLaw, parametersInKineticLawOnly, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList);
+            this.kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLaw, parametersInKineticLawOnly, compartmentInKineticLaw, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList);
         } else {
             this.analysis["pureNumber"] = true;
         }
     }
 
-    kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLaw, parametersInKineticLawOnly, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList) {
+    kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLaw, parametersInKineticLawOnly, compartmentInKineticLaw, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList) {
         this.assignPythonVals();
         this.analysis["floatingSpecies"] = this.checkFloatingSpecies(speciesInKineticLaw, reactantList);
         this.analysis["inconsistentProducts"] = this.checkIrreversibleProduct(speciesInKineticLaw, productList);
@@ -128,9 +133,9 @@ class KineticLaw {
             this.analysis["namingConvention"] = {'k': [], 'v': []};
         }
         if (this.formattingConvention) {
-            this.analysis["formattingConvention"] = this.checkFormattingConventions();
+            this.analysis["formattingConvention"] = this.checkFormattingConventions(kinetics, kineticsSim, idsList, compartmentInKineticLaw, parametersInKineticLawOnly, speciesInKineticLaw);
         } else {
-            this.analysis["formattingConvention"] = null;
+            this.analysis["formattingConvention"] = 0;
         }
         this.assignPythonSymbols();
     }
@@ -323,7 +328,130 @@ class KineticLaw {
         return ret;
     }
 
-    checkFormattingConventions(parameter)
+    /**
+     * Checks the formatting conventions of a rate law expression based on compartments,
+     * parameters, and species. Handles specific cases for MM, MMcat, Hill, and Fraction classifications.
+     * 
+     * @param {string} kinetics - The original rate law to analyze.
+     * @param {string} kineticsSim - The simplified rate law to analyze.
+     * @param {string[]} idsList - An array of element IDs to consider.
+     * @param {string[]} compartmentInKineticLaw - An array of compartments in the rate law.
+     * @param {string[]} parametersInKineticLawOnly - An array of parameters in the rate law.
+     * @param {string[]} speciesInKineticLaw - An array of species in the rate law.
+     * @returns {number} A number representing the formatting convention status, where:
+     *                   0 = formatted correctly,
+     *                   1 = elements not in alphabetical order,
+     *                   2 = formatting convention not followed,
+     *                   >= 3 = rate law in fraction form,
+     *                   3 = denominator not in alphabetical order,
+     *                   4 = numerator and denominator not in alphabetical order,
+     *                   5 = numerator convention not followed and denominator not in alphabetical order,
+     *                   6 = denominator convention not followed,
+     *                   7 = numerator not in alphabetical order and denominator convention not followed,
+     *                   8 = numerator and denominator convention not followed.
+     */
+    checkFormattingConventions(kinetics, kineticsSim, idsList, compartmentInKineticLaw, parametersInKineticLawOnly, speciesInKineticLaw) {
+        var ret = 0;
+        if (this.classificationCp["MM"] ||
+            this.classificationCp["MMcat"] ||
+            this.classificationCp["Hill"] ||
+            this.classificationCp["Fraction"]
+            ) {
+            var eq = this._numeratorDenominator(kineticsSim, idsList);
+            ret = this._checkExpressionFormat(eq0, compartmentInKineticLaw, parametersInKineticLawOnly, speciesInKineticLaw);
+            ret += 3 * this._checkExpressionFormat(eq1, compartmentInKineticLaw, parametersInKineticLawOnly, speciesInKineticLaw);
+        } else {
+            ret = this._checkExpressionFormat(kinetics, compartmentInKineticLaw, parametersInKineticLawOnly, speciesInKineticLaw);
+        }
+        return ret;
+    }
+
+    escapeRegex(string) {
+        return string.replace(/[/\-\\^$*+?.()|[\]{}]/g, '\\$&');
+    }
+
+    /**
+     * Finds the positions of elements in a given rate law and returns an object containing
+     * the largest position, smallest position, and a flag indicating if the positions are increasing.
+     * 
+     * @param {string[]} elementList - An array of elements to find in the rate law.
+     * @param {string} rateLaw - The rate law in which to search for the elements.
+     * @returns {Object} An object containing the largest position, smallest position, and increasing flag.
+     */
+    _findPositionsInRateLaw(elementList, rateLaw) {
+        var largestPosition = -1;
+        var smallestPosition = Infinity;
+        var prevPosition = -1;
+        var increasingFlag = true;
+
+        elementList.forEach(element => {
+            var pattern = new RegExp("\\b" + this.escapeRegex(element) + "\\b");
+            var index = rateLaw.search(pattern);
+            if (index >= 0) {
+                largestPosition = Math.max(index, largestPosition);
+                smallestPosition = Math.min(index, smallestPosition);
+                if (index < prevPosition) {
+                    increasingFlag = false;
+                }
+                prevPosition = index;
+            }
+        });
+
+        return {largestPosition, smallestPosition, increasingFlag};
+    }
+
+    /**
+     * Checks the format of a rate law based on the positions of compartments, parameters, and species.
+     * 
+     * @param {string} kinetics - The rate law to analyze.
+     * @param {string[]} compartmentInKineticLaw - An array of compartments in the rate law.
+     * @param {string[]} parametersInKineticLawOnly - An array of parameters in the rate law.
+     * @param {string[]} speciesInKineticLaw - An array of species in the rate law.
+     * @returns {number} Returns 0 if formatted correctly, 1 if elements are not in alphabetical order, or 2 if the formatting convention is not followed.
+     */
+    _checkProductOfTermsFormat(kinetics, compartmentInKineticLaw, parametersInKineticLawOnly, speciesInKineticLaw) {
+        const compStats = this._findPositionsInRateLaw(compartmentInKineticLaw, kinetics);
+        const paramStats = this._findPositionsInRateLaw(parametersInKineticLawOnly, kinetics);
+        const specStats = this._findPositionsInRateLaw(speciesInKineticLaw, kinetics);
+        var isFormatted = (compStats.largestPosition < paramStats.smallestPosition || paramStats.smallestPosition === Infinity)
+              && (paramStats.largestPosition < specStats.smallestPosition || specStats.smallestPosition === Infinity)
+              && (compStats.largestPosition < specStats.smallestPosition || specStats.smallestPosition === Infinity);
+        var increasingFlag = compStats.increasingFlag && paramStats.increasingFlag && specStats.increasingFlag;
+        if (isFormatted) {
+            if (increasingFlag) {
+                return 0;
+            } else {
+                return 1;
+            }
+        }
+        return 2;
+    }
+
+
+    /**
+     * Analyzes a rate law expression and checks its format based on the positions of compartments,
+     * parameters, and species.
+     * 
+     * @param {string} kinetics - The rate law to analyze.
+     * @param {string[]} compartmentInKineticLaw - An array of compartments in the rate law.
+     * @param {string[]} parametersInKineticLawOnly - An array of parameters in the rate law.
+     * @param {string[]} speciesInKineticLaw - An array of species in the rate law.
+     * @returns {number} Returns 0 if formatted correctly, 1 if elements are not in alphabetical order, or 2 if the formatting convention is not followed.
+     */
+    _checkExpressionFormat(kinetics, compartmentInKineticLaw, parametersInKineticLawOnly, speciesInKineticLaw) {
+        compartmentInKineticLaw.sort();
+        parametersInKineticLawOnly.sort();
+        speciesInKineticLaw.sort();
+        var productOfTerms = kinetics.split(/[+-]/);
+        var ret = 0;
+        productOfTerms.forEach(term => {
+            var format = this._checkProductOfTermsFormat(kinetics, compartmentInKineticLaw, parametersInKineticLawOnly, speciesInKineticLaw);
+            if (format > ret) {
+                ret = format;
+            }
+        });
+        return ret;
+    }
 
     /**
      * check if symbols in the list start with given start

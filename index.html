@@ -212,7 +212,8 @@
       // Try to create a new ProcessSBML object with the SBML string
       try {
         var namingConvention = document.getElementById("namingConvention").checked;
-        SBMLProcessor = new ProcessSBML(sbmlResult, pyodide, lib, namingConvention);
+        var formattingConvention = document.getElementById("formattingConvention").checked;
+        SBMLProcessor = new ProcessSBML(sbmlResult, pyodide, lib, namingConvention, formattingConvention);
 
         // If successful, get the species, parameters, and reactions from the ProcessSBML object
         const species = SBMLProcessor.getSpeciesList();
@@ -324,17 +325,25 @@
             <h5 style="background-color:#ff4d4d;">Error Codes:</h5>
             <p><strong>E001:</strong> No Rate Law entered<br> - The rate law is missing for the given reaction. Please provide a rate law to proceed.</p>
             <p><strong>E002:</strong> Floating reactant<br> - The reaction contains floating reactants, which are not part of any rate law expression. Please ensure all reactants are included in the rate law expression.</p>
-          
+        
             <!-- Warning code explanations -->
             <h5 style="background-color:#ffcc00;">Warning Codes:</h5>
             <p><strong>W001:</strong> Rate law contains only number<br> - The rate law consists of only a numeric value. This is usually not a valid rate law for a reaction.</p>
             <p><strong>W002:</strong> Unrecognized rate law from the standard list<br> - The rate law provided does not match any of the recognized standard rate laws. Please verify the rate law and make sure it is in a supported format.</p>
-            <p><strong>W004:</strong> Irreversible reaction kinetic law contains products<br> - The rate law for an irreversible reaction should not include products. Please verify the rate law and adjust accordingly.</p>
-            <p><strong>W005:</strong> Non-increasing species<br> - The rate law contains species that do not increase during the reaction. This could indicate an issue with the reaction or rate law. Please review the reaction and rate law.</p>
-            <p><strong>W006:</strong> We recommend that these parameters start with 'k'<br> - Certain parameters in the rate law are not following the recommended naming convention (starting with 'k'). Consider renaming these parameters to improve readability.</p>
-            <p><strong>W007:</strong> We recommend that these parameters start with 'v'<br> - Certain parameters in the rate law are not following the recommended naming convention (starting with 'v'). Consider renaming these parameters to improve readability.</p>
+            <p><strong>W003:</strong> Irreversible reaction kinetic law contains products<br> - The rate law for an irreversible reaction should not include products. Please verify the rate law and adjust accordingly.</p>
+            <p><strong>W004:</strong> Non-increasing species<br> - The rate law contains species that do not increase during the reaction. This could indicate an issue with the reaction or rate law. Please review the reaction and rate law.</p>
+            <h6>Naming Conventions:</h6>
+            <p><strong>W005:</strong> We recommend that these parameters start with 'k'<br> - Certain parameters in the rate law are not following the recommended naming convention (starting with 'k'). Consider renaming these parameters to improve readability.</p>
+            <p><strong>W006:</strong> We recommend that these parameters start with 'v'<br> - Certain parameters in the rate law are not following the recommended naming convention (starting with 'v'). Consider renaming these parameters to improve readability.</p>
+            <h6>Formatting Conventions:</h6>
+            <p><strong>W007:</strong> Elements of the same type should be ordered alphabetically<br> - The elements within the rate law are not ordered alphabetically. Reordering the elements can improve readability and consistency.</p>
             <p><strong>W008:</strong> Formatting convention not followed (compartment before parameters before species)<br> - The rate law does not follow the recommended formatting convention, which suggests placing compartments before parameters and species. Adjust the rate law to adhere to this convention for better readability and consistency.</p>
-            <p><strong>W009:</strong> Elements of the same type should be ordered alphabetically<br> - The elements within the rate law are not ordered alphabetically. Reordering the elements can improve readability and consistency.</p>
+            <p><strong>W009:</strong> Denominator not in alphabetical order<br> - The denominator in the rate law is not ordered alphabetically. Reordering the elements can improve readability and consistency.</p>
+            <p><strong>W010:</strong> Numerator and denominator not in alphabetical order<br> - Both the numerator and denominator in the rate law are not ordered alphabetically. Reordering the elements can improve readability and consistency.</p>
+            <p><strong>W011:</strong> Numerator convention not followed and denominator not in alphabetical order<br> - The numerator in the rate law does not follow the recommended formatting convention and the denominator is not ordered alphabetically. Adjust the rate law to adhere to these conventions for better readability and consistency.</p>
+            <p><strong>W012:</strong> Denominator convention not followed<br> - The denominator in the rate law does not follow the recommended formatting convention. Adjust the rate law to adhere to this convention for better readability and consistency.</p>
+            <p><strong>W013:</strong> Numerator not in alphabetical order and denominator convention not followed<br> - The numerator in the rate law is not ordered alphabetically and the denominator does not follow the recommended formatting convention. Adjust the rate law to adhere to these conventions for better readability and consistency.</p>
+            <p><strong>W014:</strong> Numerator and denominator convention not followed<br> - Both the numerator and denominator in the rate law do not follow the recommended formatting convention. Adjust the rate law to adhere to this convention for better readability and consistency.</p>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -361,6 +370,11 @@
         <div class="mb-3">
           <input type="checkbox" id="namingConvention" name="namingConvention">
           <label for="namingConvention">Naming Convention Check</label>
+        </div>
+
+        <div class="mb-3">
+          <input type="checkbox" id="formattingConvention" name="formattingConvention">
+          <label for="formattingConvention">Formatting Convention Check</label>
         </div>
       </div>
       <div class="col-md-6">
