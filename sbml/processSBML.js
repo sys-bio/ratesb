@@ -1,6 +1,6 @@
 /** Process SBML file with an input SBML model in string */
 class ProcessSBML {
-    constructor( modelStr, pyodide, libsbml, namingConvention, formattingConvention ) {
+    constructor( modelStr, pyodide, libsbml, checks ) {
         this.pyodide = pyodide;
         this.libsbml = libsbml;
         const reader = new this.libsbml.SBMLReader();
@@ -47,7 +47,7 @@ class ProcessSBML {
         this.functionDefinitions = this.getFunctionDefinitions();
         this.reactions = [];
         for (i = 0; i < this.model.getNumReactions(); i++) {
-            this.reactions.push(new Reaction(this.model, this.model.getReaction(i), this.functionDefinitions, pyodide, this, namingConvention, formattingConvention));
+            this.reactions.push(new Reaction(this.model, this.model.getReaction(i), this.functionDefinitions, pyodide, this, checks));
         }
     }
 

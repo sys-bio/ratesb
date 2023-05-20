@@ -1,7 +1,7 @@
 /** Provides Information on SBML Kinetics Laws */
 
 class KineticLaw {
-    constructor( libsbmlModel, libsbmlReaction, libsbmlKinetics, reaction, functionDefinitions, pyodide, processSBML, namingConvention, formattingConvention) {
+    constructor( libsbmlModel, libsbmlReaction, libsbmlKinetics, reaction, functionDefinitions, pyodide, processSBML, checks) {
         this.libsbmlModel = libsbmlModel;
         this.libsbmlReaction = libsbmlReaction;
         this.pyodide = pyodide;
@@ -32,8 +32,7 @@ class KineticLaw {
         this.sympyFormula = this.expandedFormula.replaceAll("^", "**");
         this.classificationCp = {};
         this.analysis = {};
-        this.namingConvention = namingConvention;
-        this.formattingConvention = formattingConvention;
+        this.checks = checks;
         if (this.formula.replace(/\s/g, '').length) {
             this.analysis["emptyRateLaw"] = false;
             this.classify();
@@ -116,23 +115,27 @@ class KineticLaw {
             this.classificationCp["Polynomial"] = this.isPolynomial(kineticsSim, idsList, speciesInKineticLaw);
     
             console.log(this.classificationCp);
-            this.kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLaw, parametersInKineticLawOnly, compartmentInKineticLaw, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList);
+            this.kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLawOnly, compartmentInKineticLaw, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList);
         } else {
             this.analysis["pureNumber"] = true;
         }
     }
 
-    kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLaw, parametersInKineticLawOnly, compartmentInKineticLaw, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList) {
+    kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLawOnly, compartmentInKineticLaw, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList) {
         this.assignPythonVals();
         this.analysis["floatingSpecies"] = this.checkFloatingSpecies(speciesInKineticLaw, reactantList);
-        this.analysis["inconsistentProducts"] = this.checkIrreversibleProduct(speciesInKineticLaw, productList);
-        this.analysis["nonIncreasingSpecies"] = this.checkNonIncreasingSpecies(speciesInKineticLaw, parametersInKineticLaw, reactantList, productList, kinetics);
-        if (this.namingConvention) {
+        if (this.checks["reversibilityCheck"]) {
+            this.analysis["inconsistentProducts"] = this.checkIrreversibleProduct(speciesInKineticLaw, productList);
+        } else {
+            this.analysis["inconsistentProducts"] = [];
+        }
+        this.analysis["nonIncreasingSpecies"] = this.checkNonIncreasingSpecies(speciesInKineticLaw, reactantList, productList, kinetics);
+        if (this.checks["namingConvention"]) {
             this.analysis["namingConvention"] = this.checkNamingConventions(parametersInKineticLawOnly, kineticsSim, idsList);
         } else {
             this.analysis["namingConvention"] = {'k': [], 'v': []};
         }
-        if (this.formattingConvention) {
+        if (this.checks["formattingConvention"]) {
             this.analysis["formattingConvention"] = this.checkFormattingConventions(kinetics, kineticsSim, idsList, compartmentInKineticLaw, parametersInKineticLawOnly, speciesInKineticLaw);
         } else {
             this.analysis["formattingConvention"] = 0;
@@ -213,32 +216,26 @@ class KineticLaw {
      * If reversible, check if the rate law is decreasing as each product increases
      * Return a list of species that violates this rule
      * @param {[]} speciesInKineticLaw list-species in the kinetics
-     * @param {[]} parametersInKineticLaw list-parameters in the kinetics
      * @param {[]} reactantList list-reactants of the reaction
      * @param {[]} productList list-products of the reaction
      * @param {string} kinetics string-kinetics
-     * @return {[]} list of species violating the rule
+     * @return {[[], []]} list of species violating the rule, first list contains the reactants, second list contains the products.
      */
-    checkNonIncreasingSpecies(speciesInKineticLaw, parametersInKineticLaw, reactantList, productList, kinetics) {
-        // console.log(speciesInKineticLaw)
-        // console.log(parametersInKineticLaw)
-        // console.log(reactantList)
-        // console.log(productList)
-        // console.log(kinetics)
-        var nonIncreasingSpecies = [];
+    checkNonIncreasingSpecies(speciesInKineticLaw, reactantList, productList, kinetics) {
+        var nonIncreasingSpecies = [[],[]];
 
         this._assignPythonLocalVals();
         var prev;
         reactantList.forEach(reactant => {
             this._assignOtherSpeciesVals(reactant, speciesInKineticLaw, 1);
-            prev = 0;
+            prev = -Math.Infinity;
             for (var i = -1; i <= 1; i += 0.1) {
                 this.pyodide.runPython(`
                     ${reactant} = ${Math.pow(10, i)}
                     js.curr = ${kinetics}
                 `);
                 if (curr <= prev) {
-                    nonIncreasingSpecies.push(reactant);
+                    nonIncreasingSpecies[0].push(reactant);
                     break;
                 }
                 prev = curr;
@@ -255,7 +252,7 @@ class KineticLaw {
                             js.curr = ${kinetics}
                         `);
                         if (curr >= prev) {
-                            nonIncreasingSpecies.push(product);
+                            nonIncreasingSpecies[1].push(product);
                             break;
                         }
                         prev = curr;
@@ -358,10 +355,10 @@ class KineticLaw {
             this.classificationCp["Fraction"]
             ) {
             var eq = this._numeratorDenominator(kineticsSim, idsList);
-            ret = this._checkExpressionFormat(eq0, compartmentInKineticLaw, parametersInKineticLawOnly, speciesInKineticLaw);
-            ret += 3 * this._checkExpressionFormat(eq1, compartmentInKineticLaw, parametersInKineticLawOnly, speciesInKineticLaw);
+            ret = this._checkExpressionFormat(eq0, compartmentInKineticLaw, parametersInKineticLawOnly);
+            ret += 3 * this._checkExpressionFormat(eq1, compartmentInKineticLaw, parametersInKineticLawOnly);
         } else {
-            ret = this._checkExpressionFormat(kinetics, compartmentInKineticLaw, parametersInKineticLawOnly, speciesInKineticLaw);
+            ret = this._checkExpressionFormat(kinetics, compartmentInKineticLaw, parametersInKineticLawOnly);
         }
         return ret;
     }
@@ -435,17 +432,15 @@ class KineticLaw {
      * @param {string} kinetics - The rate law to analyze.
      * @param {string[]} compartmentInKineticLaw - An array of compartments in the rate law.
      * @param {string[]} parametersInKineticLawOnly - An array of parameters in the rate law.
-     * @param {string[]} speciesInKineticLaw - An array of species in the rate law.
      * @returns {number} Returns 0 if formatted correctly, 1 if elements are not in alphabetical order, or 2 if the formatting convention is not followed.
      */
-    _checkExpressionFormat(kinetics, compartmentInKineticLaw, parametersInKineticLawOnly, speciesInKineticLaw) {
+    _checkExpressionFormat(kinetics, compartmentInKineticLaw, parametersInKineticLawOnly) {
         compartmentInKineticLaw.sort();
         parametersInKineticLawOnly.sort();
-        speciesInKineticLaw.sort();
         var productOfTerms = kinetics.split(/[+-]/);
         var ret = 0;
         productOfTerms.forEach(term => {
-            var format = this._checkProductOfTermsFormat(kinetics, compartmentInKineticLaw, parametersInKineticLawOnly, speciesInKineticLaw);
+            var format = this._checkProductOfTermsFormat(kinetics, compartmentInKineticLaw, parametersInKineticLawOnly, this.reaction.sortedSpeciesList);
             if (format > ret) {
                 ret = format;
             }

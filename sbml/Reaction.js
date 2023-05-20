@@ -1,6 +1,6 @@
 /** Abstraction for a Reaction */
 class Reaction {
-    constructor( libsbmlModel, libsbmlReaction, functionDefinitions, pyodide, processSBML, namingConvention, formattingConvention ) {
+    constructor( libsbmlModel, libsbmlReaction, functionDefinitions, pyodide, processSBML, checks ) {
         this.reaction = libsbmlReaction;
         console.log(this.reaction)
         this.reactantList = [];
@@ -14,10 +14,9 @@ class Reaction {
             var product = this.reaction.getProduct(i)
             this.productList.push(product.getSpecies());
         }
+        this.sortedSpeciesList = this.reactantList.concat(this.productList);
         this.id = this.reaction.getId();
-        this.namingConvention = namingConvention;
-        this.formattingConvention = formattingConvention;
-        this.kineticLaw = new KineticLaw(libsbmlModel, libsbmlReaction, this.reaction.getKineticLaw(), this, functionDefinitions, pyodide, processSBML, namingConvention, formattingConvention);
+        this.kineticLaw = new KineticLaw(libsbmlModel, libsbmlReaction, this.reaction.getKineticLaw(), this, functionDefinitions, pyodide, processSBML, checks);
     }
 
     getId() {
@@ -46,7 +45,11 @@ class Reaction {
         } else {
             kineticStr = this.kineticLaw.formula;
         }
-        var ret = `${reactantStr} -> ${productStr}; ${kineticStr}`;
+        var reactionArrow = "=>";
+        if (this.reaction.getReversible()) {
+            reactionArrow = "->";
+        }
+        var ret = `${reactantStr} ${reactionArrow} ${productStr}; ${kineticStr}`;
         if (this.kineticLaw.analysis["emptyRateLaw"]) {
             ret += "\nError E001: No Rate Law entered";
         } else if (this.kineticLaw.analysis["pureNumber"]) {
@@ -72,8 +75,11 @@ class Reaction {
             if (this.kineticLaw.analysis["inconsistentProducts"].length > 0) {
                 ret += `\nWarning W003: Irreversible reaction kinetic law contains products: ${this.kineticLaw.analysis["inconsistentProducts"].toString()}`;
             }
-            if (this.kineticLaw.analysis["nonIncreasingSpecies"].length > 0) {
-                ret += `\nWarning W004: Non increasing species: ${kineticLaw.analysis["nonIncreasingSpecies"].toString()}`;
+            if (this.kineticLaw.analysis["nonIncreasingSpecies"][0].length > 0) {
+                ret += `\nWarning W004: Flux is not increasing as reactant increases: ${this.kineticLaw.analysis["nonIncreasingSpecies"][0].toString()}`;
+            }
+            if (this.kineticLaw.analysis["nonIncreasingSpecies"][1].length > 0) {
+                ret += `\nWarning W0015: Flux is not decreasing as product increases: ${this.kineticLaw.analysis["nonIncreasingSpecies"][1].toString()}`;
             }
             if (this.kineticLaw.analysis["namingConvention"]['k'].length > 0) {
                 ret += `\nWarning W005: We recommend that these parameters start with 'k': ${this.kineticLaw.analysis["namingConvention"]['k'].toString()}`;
@@ -86,7 +92,7 @@ class Reaction {
                     // Formatted correctly, no warning needed
                     break;
                 case 1:
-                    ret += "\nWarning W007: Elements of the same type should be ordered alphabetically.";
+                    ret += "\nWarning W007: Elements of the same type are not ordered properly.";
                     break;
                 case 2:
                     ret += "\nWarning W008: Formatting convention not followed (compartment before parameters before species).";

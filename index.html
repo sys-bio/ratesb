@@ -12,6 +12,9 @@
   <link rel="stylesheet" href="css/style.css" />
   <link rel = 'stylesheet' href = "https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-KyZXEAg3QhqLMpG8r+Knujsl7/1L_dstPt3HV5HzF6Gvk/e3s2lfoUJklFJ1zla2" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/5.3.0/js/bootstrap.min.js" integrity="sha384-5n0eY3kH6cg3xgF5Z6AAoM6x0jzA6n9+3GdH/7u6g9FJs4Ck5BdPtF+to8xM6B5z" crossorigin="anonymous"></script>
   
   <script src="https://cdn.jsdelivr.net/pyodide/v0.22.1/full/pyodide.js"></script>
 
@@ -32,19 +35,81 @@
 
   <script type="text/javascript">
     const lib = libsbml();
-    async function loadPyscriptPackages() {
-      const pyodide = await loadPyodide();
-      await pyodide.loadPackage("micropip");
-      const micropip = pyodide.pyimport("micropip");
-      await micropip.install('sympy');
-      // await micropip.install('SBMLKinetics')
-      pyodide.runPython(`
-        import js
-        import sympy
-      `);
-      return pyodide;
+
+  let pyodide = null; // Declare pyodide globally
+  window.onload = async function() {
+    const loadingOverlay = document.getElementById("loadingOverlay");
+    const loadingStatus = document.getElementById("loadingStatus");
+    loadingOverlay.style.display = "block";
+
+    const bioModelInput = document.getElementById('bioModelInput');
+    bioModelInput.addEventListener('dblclick', searchAndHighlight);
+
+    const sbml_output = document.getElementById('sbml_output');
+    sbml_output.tabIndex = 0; // make div focusable
+    sbml_output.addEventListener('keydown', goToNextResult);
+
+    const loadPyscriptPackages = async () => {
+        loadingStatus.textContent = "Loading Pyodide...";
+        const pyodide = await loadPyodide();
+        loadingStatus.textContent = "Pyodide loaded! Loading packages...";
+
+        await pyodide.loadPackage("micropip");
+        loadingStatus.textContent = "micropip package loaded! Installing sympy...";
+
+        const micropip = pyodide.pyimport("micropip");
+        await micropip.install('sympy');
+        loadingStatus.textContent = "sympy installed! Running Python code...";
+
+        // await micropip.install('SBMLKinetics')
+        pyodide.runPython(`
+          import js
+          import sympy
+        `);
+        loadingStatus.textContent = "Python code run successfully! All packages loaded.";
+        return pyodide;
+      };
+      pyodide = await loadPyscriptPackages(); // Assign the loaded Pyodide instance to the global variable
+      loadingOverlay.style.display = "none";
+    };
+
+    let searchWord = '';
+    let currentHighlightIndex = -1;
+    let highlights = [];
+
+    function searchAndHighlight() {
+      const bioModelInput = document.getElementById('bioModelInput');
+      const sbml_output = document.getElementById('sbml_output');
+
+      // Get the selected text
+      searchWord = window.getSelection().toString();
+
+      // Remove previous highlights
+      sbml_output.innerHTML = sbml_output.innerHTML.replace(/<mark class="highlight">|<\/mark>/g, '');
+
+      // Highlight all matches
+      const regex = new RegExp(searchWord, 'g');
+      sbml_output.innerHTML = sbml_output.innerHTML.replace(regex, '<mark class="highlight">' + searchWord + '</mark>');
+
+      // Get all highlight elements
+      highlights = sbml_output.getElementsByClassName('highlight');
+      sbml_output.getElementsByClassName('highlight')[0].scrollIntoView({behavior: "smooth", block: "center"});
     }
 
+    function goToNextResult(event) {
+      if (event.key === 'Tab') {
+        event.preventDefault();  // Prevent the default action (scrolling)
+
+        // Go to the next highlight
+        if (highlights.length > 0) {
+          currentHighlightIndex = (currentHighlightIndex + 1) % highlights.length;
+
+          // Scroll the highlight into view
+          highlights[currentHighlightIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    }
+  
     function setLoading(loading) {
       const loadingIcon = document.getElementById("loading-icon");
       loadingIcon.style.display = loading ? "inline-block" : "none";
@@ -93,14 +158,67 @@
       console.log('Load libantimony error: ', err);
     }
 
-    // function toggleNightMode() {
-    //   const body = document.body;
-    //   if (body.classList.contains("night-mode")) {
-    //     body.classList.remove("night-mode");
-    //   } else {
-    //     body.classList.add("night-mode");
-    //   }
-    // }
+    function handleDragOver(event) {
+      event.preventDefault();
+    }
+
+    function handleFileDrop(event) {
+      event.preventDefault();
+      document.getElementById('sbml_file').files = event.dataTransfer.files;
+      loadFile();
+    }
+
+    function adjustFontSize(value) {
+      document.getElementById('sbml_output').style.fontSize = value + "rem";
+    }
+
+    function adjustInputFontSize(value) {
+      document.getElementById('bioModelInput').style.fontSize = value + "rem";
+    }
+
+    function loadFile() {
+      clearPreviousLoads();
+      var input = document.getElementById('sbml_file');
+      if(input.files.length > 0) {
+          var fileName = input.files[0].name;
+          document.getElementById('drop-zone').innerText = 'File chosen: ' + fileName;
+      } else {
+          document.getElementById('drop-zone').innerText = 'Drop file or choose file (.xml, .ant, .txt)';
+      }
+      const fileInput = document.querySelector("input[type=file]");
+      const [file] = fileInput.files;
+      const fileReader = new FileReader();
+
+      fileReader.addEventListener(
+        "load",
+        () => {
+          const modelStr = fileReader.result;
+          if (modelStr.includes("<sbml")) {
+            var ptrSBMLCode = jsAllocateUTF8(modelStr);
+            var loadInt = loadSBMLString(ptrSBMLCode);
+            if (loadInt > 0) {
+              document.getElementById("bioModelInput").value = getAntimonyString();
+            } else {
+              const outputBox = document.getElementById("sbml_output");
+              outputBox.innerHTML = "";
+
+              const errorMessage = document.createElement("div");
+              errorMessage.className = "error-message";
+              errorMessage.textContent = getLastError();
+
+              outputBox.appendChild(errorMessage);
+            }
+            jsFree(ptrSBMLCode);
+          } else {
+            document.getElementById("bioModelInput").value = modelStr;
+          }
+        },
+        false
+      );
+      if (file) {
+        fileReader.readAsText(file);
+      }
+    }
 
     function toggleNightMode() {
       const nightModeToggle = document.getElementById("night-mode-toggle");
@@ -117,19 +235,10 @@
       clearPreviousLoads();
       const fileInput = document.querySelector("input[type=file]");
       if (fileInput.files.length === 0) {
-        const antStr = document.getElementById("bioModelInput").value;
-        if (antStr.length > 0) {
-          setLoading(true);
-          processTextInput();
-          setLoading(false);
-          return;
-        } else {
-          alert("Please select a file.");
-          return;
-        }
+        alert("Please select a file.");
+        return;
       }
       setLoading(true);
-      const pyodide = await loadPyscriptPackages();
 
       const [file] = fileInput.files;
       const fileReader = new FileReader();
@@ -138,7 +247,7 @@
         "load",
         () => {
           const modelStr = fileReader.result;
-          changeSBML(modelStr, pyodide, true);
+          changeSBML(modelStr, pyodide);
           setLoading(false);
         },
         false
@@ -150,9 +259,11 @@
     }
 
     async function processTextInput() {
+      clearPreviousLoads();
       const modelStr = document.getElementById("bioModelInput").value;
-      const pyodide = await loadPyscriptPackages();
-      changeSBML(modelStr, pyodide, false);
+      setLoading(true);
+      changeSBML(modelStr, pyodide);
+      setLoading(false);
     }
 
     /**
@@ -161,7 +272,8 @@
      * @param {string} modelStr - The model string to be processed, in Antimony or SBML format.
      * @param {object} pyodide - A Pyodide object used to create the ProcessSBML object.
      */
-    function changeSBML(modelStr, pyodide, changeTextInput) {
+    function changeSBML(modelStr, pyodide) {
+      setLoading(true);
       // Declare variables
       var sbmlResult;
       var SBMLProcessor;
@@ -176,19 +288,17 @@
         // If the model loaded successfully, get the SBML string
         if (loadInt > 0) {
           sbmlResult = getSBMLString();
-          if (changeTextInput) {
-            document.getElementById("bioModelInput").value = modelStr;
-          }
         } else {
           const outputBox = document.getElementById("sbml_output");
           outputBox.innerHTML = "";
 
           const errorMessage = document.createElement("div");
           errorMessage.className = "error-message";
-          errorMessage.textContent = "Not valid Antimony!";
+          errorMessage.textContent = getLastError();
 
           outputBox.appendChild(errorMessage);
           jsFree(ptrAntCode);
+          setLoading(false);
           return;
         }
         jsFree(ptrAntCode);
@@ -196,24 +306,16 @@
       } else {
         // If the model string already contains the <sbml tag, use it as is
         sbmlResult = modelStr;
-        if (changeTextInput) {
-          var ptrSBMLCode = jsAllocateUTF8(modelStr);
-          var loadInt = loadSBMLString(ptrSBMLCode);
-          if (loadInt > 0) {
-            document.getElementById("bioModelInput").value = getAntimonyString();
-          } else {
-            var errStr = getLastError();
-            window.alert(errStr);
-          }
-          jsFree(ptrSBMLCode);
-        } 
       }
 
       // Try to create a new ProcessSBML object with the SBML string
       try {
-        var namingConvention = document.getElementById("namingConvention").checked;
-        var formattingConvention = document.getElementById("formattingConvention").checked;
-        SBMLProcessor = new ProcessSBML(sbmlResult, pyodide, lib, namingConvention, formattingConvention);
+        var checks = {};
+        checks["reversibilityCheck"] = document.getElementById("reversibilityCheck").checked;
+        checks["namingConvention"] = document.getElementById("namingConvention").checked;
+        checks["formattingConvention"] = document.getElementById("formattingConvention").checked;
+
+        SBMLProcessor = new ProcessSBML(sbmlResult, pyodide, lib, checks);
 
         // If successful, get the species, parameters, and reactions from the ProcessSBML object
         const species = SBMLProcessor.getSpeciesList();
@@ -266,14 +368,46 @@
         errorMessage.textContent = err.stack;
 
         outputBox.appendChild(errorMessage);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function copyInputToClipboard() {
+      const inputElement = document.getElementById("bioModelInput");
+      const tooltip = document.getElementById("copy-input-tooltip");
+      try {
+        await navigator.clipboard.writeText(inputElement.value);
+        // Show the tooltip
+        tooltip.style.visibility = "visible";
+        tooltip.style.opacity = "1";
+
+        // After 3 seconds, hide the tooltip
+        setTimeout(() => {
+          tooltip.style.visibility = "hidden";
+          tooltip.style.opacity = "0";
+        }, 3000);
+      } catch (err) {
+        console.error("Error copying text: ", err);
+        alert("Error copying output to clipboard. Please try again.");
       }
     }
 
     async function copyToClipboard() {
       const outputElement = document.getElementById("sbml_output");
+      const tooltip = document.getElementById("copy-tooltip");
       try {
         await navigator.clipboard.writeText(outputElement.innerText);
         // alert("Output copied to clipboard!");
+        // Show the tooltip
+        tooltip.style.visibility = "visible";
+        tooltip.style.opacity = "1";
+
+        // After 3 seconds, hide the tooltip
+        setTimeout(() => {
+          tooltip.style.visibility = "hidden";
+          tooltip.style.opacity = "0";
+        }, 3000);
       } catch (err) {
         console.error("Error copying text: ", err);
         alert("Error copying output to clipboard. Please try again.");
@@ -283,6 +417,11 @@
 </head>
 
 <body>
+  <div id="loadingOverlay" style="display: none; position: fixed; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(255,255,255,0.8); z-index: 9999; cursor: progress;">
+    <div id="loadingStatus" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; font-size: 20px;">
+        Loading...
+    </div>
+  </div>
   <div class="container py-5">
     <div class="d-flex justify-content-center align-items-center mb-4">
       <h1 class="mb-0">RateSB</h1>
@@ -299,12 +438,14 @@
       <div class="modal-dialog">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title" id="infoModalLabel">Website Rules</h5>
+            <h5 class="modal-title" id="infoModalLabel">Website Info</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
             <p>If a file is given, the Antimony version (if the given input is in SBML, it will be converted into Antimony) will be available in the text input box on the left.</p>
-            <p>If no file is given, then RateSB will look for the text input and analyze that instead.</p>
+            <p>"Analyze File" button analyzes the file directly.</p>
+            <p>"Analyze Model" button analyzes the Antimony text in the text box.</p>
+            <p>When double clicking on a word in the left text box, find all instances of that word in the right-side output box and highlight them. You can then use the Tab key to navigate through each highlighted instance.</p>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -331,12 +472,13 @@
             <p><strong>W001:</strong> Rate law contains only number<br> - The rate law consists of only a numeric value. This is usually not a valid rate law for a reaction.</p>
             <p><strong>W002:</strong> Unrecognized rate law from the standard list<br> - The rate law provided does not match any of the recognized standard rate laws. Please verify the rate law and make sure it is in a supported format.</p>
             <p><strong>W003:</strong> Irreversible reaction kinetic law contains products<br> - The rate law for an irreversible reaction should not include products. Please verify the rate law and adjust accordingly.</p>
-            <p><strong>W004:</strong> Non-increasing species<br> - The rate law contains species that do not increase during the reaction. This could indicate an issue with the reaction or rate law. Please review the reaction and rate law.</p>
+            <p><strong>W004:</strong> Flux is not increasing as reactant increases<br> - The rate law contains reactant that has a non-positive relationship with the reaction flux. Note: some parameters might not be initialized or assigned a wrong value.</p>
+            <p><strong>W015:</strong> Flux is not decreasing as product increases<br> - The rate law contains product that has a non-negative relationship with the reaction flux. Note: some parameters might not be initialized or assigned a wrong value.</p>
             <h6>Naming Conventions:</h6>
             <p><strong>W005:</strong> We recommend that these parameters start with 'k'<br> - Certain parameters in the rate law are not following the recommended naming convention (starting with 'k'). Consider renaming these parameters to improve readability.</p>
             <p><strong>W006:</strong> We recommend that these parameters start with 'v'<br> - Certain parameters in the rate law are not following the recommended naming convention (starting with 'v'). Consider renaming these parameters to improve readability.</p>
             <h6>Formatting Conventions:</h6>
-            <p><strong>W007:</strong> Elements of the same type should be ordered alphabetically<br> - The elements within the rate law are not ordered alphabetically. Reordering the elements can improve readability and consistency.</p>
+            <p><strong>W007:</strong> Elements of the same type are not ordered properly <br> - Compartments and parameters are not in alphabetical order, or species are of different order as they appear in the reaction. Reordering the elements can improve readability and consistency.</p>
             <p><strong>W008:</strong> Formatting convention not followed (compartment before parameters before species)<br> - The rate law does not follow the recommended formatting convention, which suggests placing compartments before parameters and species. Adjust the rate law to adhere to this convention for better readability and consistency.</p>
             <p><strong>W009:</strong> Denominator not in alphabetical order<br> - The denominator in the rate law is not ordered alphabetically. Reordering the elements can improve readability and consistency.</p>
             <p><strong>W010:</strong> Numerator and denominator not in alphabetical order<br> - Both the numerator and denominator in the rate law are not ordered alphabetically. Reordering the elements can improve readability and consistency.</p>
@@ -354,27 +496,55 @@
 
     <div class="row">
       <div class="col-md-6">
+        <div class="mb-3" style="width: 100%;">
+          <input type="file" accept=".xml,.ant,.txt" id="sbml_file" name="SBML file" class="form-control" onchange="loadFile()" style="display: none;">
+          <label for="sbml_file" style="width: 100%;">
+              <div id="drop-zone" ondragover="handleDragOver(event)" ondrop="handleFileDrop(event)" style="border: 2px dashed #999; padding: 20px; text-align: center; cursor: pointer; width: 100%; overflow: auto;">
+                  Drop file or choose file (.xml, .ant, .txt)
+              </div>
+          </label>
+      </div>
         <div class="mb-3">
-          <label for="sbml_file" class="form-label">Select a file (.xml, .ant, .txt):</label>
-          <input type="file" accept=".xml,.ant,.txt" id="sbml_file" name="SBML file" class="form-control">
+          <button id="ClickMe" class="btn btn-primary" onclick="processFileInput()">Analyze File</button>
         </div>
 
         <div class="mb-3">
-          <textarea id="bioModelInput" class="form-control" rows="20" placeholder="[Antimony code here.]"></textarea>
+          <textarea id="bioModelInput" class="form-control" rows="6" placeholder="[Antimony code here.]"></textarea>
+        </div>
+
+        <div>
+          <label for="font-size-range">Adjust font size:</label>
+          <input type="range" id="font-size-range" min="0.5" max="3" step="0.1" value="1" oninput="adjustInputFontSize(value)" style="width: 100%;">
         </div>
 
         <div class="mb-3">
-          <button id="ClickMe" class="btn btn-primary" onclick="processFileInput()">Analyze Model</button>
+          <button id="ClickMe" class="btn btn-primary" onclick="processTextInput()">Analyze Model</button>
+          <button id="copyInputToClipboard" class="btn btn-secondary" onclick="copyInputToClipboard()">Copy to Clipboard</button>
+          <span id="copy-input-tooltip" style="visibility: hidden; opacity: 0; transition: visibility 0s, opacity 0.5s linear;">Copied to clipboard!</span>
         </div>
 
-        <div class="mb-3">
-          <input type="checkbox" id="namingConvention" name="namingConvention">
-          <label for="namingConvention">Naming Convention Check</label>
+        <div class="d-flex align-items-center mb-3">
+          <div style="flex: 1;">
+            <input type="checkbox" id="reversibilityCheck" name="reversibilityCheck">
+            <label for="reversibilityCheck">Reversibility Check</label>
+          </div>
+          <span class="info-tooltip" data-bs-toggle="tooltip" data-bs-placement="right" title="Warns when irreversible reaction rate law includes any product."><i class="fas fa-info"></i></span>
         </div>
-
-        <div class="mb-3">
-          <input type="checkbox" id="formattingConvention" name="formattingConvention">
-          <label for="formattingConvention">Formatting Convention Check</label>
+        
+        <div class="d-flex align-items-center mb-3">
+          <div style="flex: 1;">
+            <input type="checkbox" id="namingConvention" name="namingConvention">
+            <label for="namingConvention">Naming Convention Check</label>
+          </div>
+          <span class="info-tooltip" data-bs-toggle="tooltip" data-bs-placement="right" title="Warns when a symbol name is not common."><i class="fas fa-info"></i></span>
+        </div>
+        
+        <div class="d-flex align-items-center mb-3">
+          <div style="flex: 1;">
+            <input type="checkbox" id="formattingConvention" name="formattingConvention">
+            <label for="formattingConvention">Formatting Convention Check</label>
+          </div>
+          <span class="info-tooltip" data-bs-toggle="tooltip" data-bs-placement="right" title="Warns when symbols are not ordered conventionally."><i class="fas fa-info"></i></span>
         </div>
       </div>
       <div class="col-md-6">
@@ -383,11 +553,23 @@
           <span class="visually-hidden">Loading...</span>
         </div>
         <div class="output-container">
-          <div id="sbml_output" class="output-box"></div>
+          <div id="sbml_output" class="output-box" style="font-size: 1rem;"></div>
         </div>
         <button id="copyToClipboard" class="btn btn-secondary mt-3" onclick="copyToClipboard()">Copy to Clipboard</button>
+        <span id="copy-tooltip" style="visibility: hidden; opacity: 0; transition: visibility 0s, opacity 0.5s linear;">Copied to clipboard!</span>
+        <div>
+          <label for="font-size-range">Adjust font size:</label>
+          <input type="range" id="font-size-range" min="0.5" max="3" step="0.1" value="1" oninput="adjustFontSize(value)" style="width: 100%;">
+        </div>
       </div>
     </div>
   </div>
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/5.3.0/js/bootstrap.min.js" integrity="sha384-5n0eY3kH6cg3xgF5Z6AAoM6x0jzA6n9+3GdH/7u6g9FJs4Ck5BdPtF+to8xM6B5z" crossorigin="anonymous"></script>
+<script>
+  $(function () {
+    $('[data-bs-toggle="tooltip"]').tooltip()
+  })
+</script>
 </body>
 </html>

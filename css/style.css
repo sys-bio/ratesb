@@ -1,92 +1,96 @@
 body {
-    font-family: Verdana, Arial, Helvetica, sans-serif;
-  }
-  
-  .container {
-    max-width: 1000px;
-    margin: -20px auto;
-    padding: 0px;
-  }
-  
-  textarea {
-    resize: none;
-  }
-  
-  .output-container {
-    border: 1px solid #6c757d;
-    border-radius: 5px;
-    padding: 5px;
-    background-color: #f8f9fa;
-    height: 458px; /* Set a fixed height */
-    overflow-y: auto; /* Keep the scrolling */
-    margin-top: 10px;
-  }
-  
-  .output-box {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  
-  .warning-message,
-  .error-message {
-    padding: 4px;
-    border-radius: 3px;
+  font-family: Verdana, Arial, Helvetica, sans-serif;
+}
+
+.container {
+  max-width: 1000px;
+  margin: -20px auto;
+  padding: 0px;
+}
+
+textarea {
+  resize: none;
+}
+
+.output-container {
+  border: 1px solid #6c757d;
+  border-radius: 5px;
+  padding: 5px;
+  background-color: #f8f9fa;
+  height: 358px; /* Set a fixed height */
+  overflow-y: auto; /* Keep the scrolling */
+  margin-top: 10px;
+  resize: vertical;
+}
+
+.output-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.warning-message,
+.error-message {
+  padding: 4px;
+  border-radius: 3px;
+}
+
+.warning-message {
+  background-color: #ffcc00;
+}
+
+.error-message {
+  background-color: #ff4d4d;
+}
+
+/* Night mode */
+body.night-mode {
+  background-color: #1a1a1a;
+  color: #f8f9fa;
+}
+
+.night-mode .container {
+  background-color: #333;
+  border-radius: 5px;
+  padding: 20px;
+}
+
+.night-mode .output-container {
+  background-color: #333;
+}
+
+/* Night mode switch */
+.night-mode-switch {
+display: inline-flex;
+align-items: center;
+background-color: #343a40;
+color: #f8f9fa;
+padding: 5px 10px;
+border-radius: 5px;
+box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+font-size: 0.9rem;
+border: none;
+cursor: pointer;
+transition: background-color 0.3s, color 0.3s;
+}
+
+.night-mode-switch:hover {
+background-color: #495057;
+}
+
+.night-mode .night-mode-switch {
+background-color: #ffffff;
+color: #343a40;
+}
+
+.night-mode .night-mode-switch:hover {
+background-color: #f8f9fa;
+}
+
+#bioModelInput {
     font-size: 12px;
   }
   
-  .warning-message {
-    background-color: #ffcc00;
-  }
-  
-  .error-message {
-    background-color: #ff4d4d;
-  }
-  
-  /* Night mode */
-  body.night-mode {
-    background-color: #1a1a1a;
-    color: #f8f9fa;
-  }
-  
-  .night-mode .container {
-    background-color: #333;
-    border-radius: 5px;
-    padding: 20px;
-  }
-  
-  .night-mode .output-container {
-    background-color: #333;
-  }
-  
-  /* Night mode switch */
-  .night-mode-switch {
-    display: inline-flex;
-    align-items: center;
-    background-color: #343a40;
-    color: #f8f9fa;
-    padding: 5px 10px;
-    border-radius: 5px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    font-size: 0.9rem;
-    border: none;
-    cursor: pointer;
-    transition: background-color 0.3s, color 0.3s;
-    }
-
-    .night-mode-switch:hover {
-    background-color: #495057;
-    }
-
-    .night-mode .night-mode-switch {
-    background-color: #ffffff;
-    color: #343a40;
-    }
-
-    .night-mode .night-mode-switch:hover {
-    background-color: #f8f9fa;
-    }
-
-    #bioModelInput {
-        font-size: 12px;
-      }
+.highlight {
+  background-color: yellow;
+}
