@@ -123,7 +123,9 @@ class KineticLaw {
 
     kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLawOnly, compartmentInKineticLaw, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList) {
         this.assignPythonVals();
-        this.analysis["floatingSpecies"] = this.checkFloatingSpecies(speciesInKineticLaw, reactantList);
+        const floatingSpecies = this.checkFloatingSpecies(speciesInKineticLaw, reactantList);
+        this.analysis["floatingSpecies"] = floatingSpecies[0];
+        this.analysis["boundaryFloatingSpecies"] = floatingSpecies[1];
         if (this.checks["reversibilityCheck"]) {
             this.analysis["inconsistentProducts"] = this.checkIrreversibleProduct(speciesInKineticLaw, productList);
         } else {
@@ -133,7 +135,7 @@ class KineticLaw {
         if (this.checks["namingConvention"]) {
             this.analysis["namingConvention"] = this.checkNamingConventions(parametersInKineticLawOnly, kineticsSim, idsList);
         } else {
-            this.analysis["namingConvention"] = {'k': [], 'v': []};
+            this.analysis["namingConvention"] = {'k': [], 'K': [], 'V': []};
         }
         if (this.checks["formattingConvention"]) {
             this.analysis["formattingConvention"] = this.checkFormattingConventions(kinetics, kineticsSim, idsList, compartmentInKineticLaw, parametersInKineticLawOnly, speciesInKineticLaw);
@@ -144,23 +146,34 @@ class KineticLaw {
     }
 
     assignPythonVals() {
+        this.analysis["uninitializedParameters"] = [];
+        this.analysis["uninitializedCompartments"] = [];
         var object;
         var val;
+        var id;
         for (var i = 0; i < this.libsbmlModel.getNumParameters(); i++) {
             object = this.libsbmlModel.getParameter(i);
             val = object.getValue();
+            id = object.getId();
             if (val == 0 || isNaN(val)) {
                 // need to give warning if val is not assigned
                 val = 1;
+                this.analysis["uninitializedParameters"].push(id);
             }
             this.pyodide.runPython(`
-                ${object.getId()} = ${val}
+                ${id} = ${val}
             `);
         }
         for (var i = 0; i < this.libsbmlModel.getNumCompartments(); i++) {
             object = this.libsbmlModel.getCompartment(i);
+            val = object.getSize();
+            id = object.getId();
+            if (val == 0 || isNaN(val)) {
+                val = 1;
+                this.analysis["uninitializedCompartments"].push(id);
+            }
             this.pyodide.runPython(`
-                ${object.getId()} = ${object.getSize()}
+                ${id} = ${val}
             `);
         }
     }
@@ -191,12 +204,17 @@ class KineticLaw {
      */
     checkFloatingSpecies(speciesInKineticLaw, reactantList) {
         var floatingSpecies = [];
+        var boundaryFloatingSpecies = [];
         reactantList.forEach(reactant => {
             if (!speciesInKineticLaw.includes(reactant)) {
-                floatingSpecies.push(reactant);
+                if (this.reaction.boundarySpeciesList.includes(reactant)) {
+                    boundaryFloatingSpecies.push(reactant);
+                } else {
+                    floatingSpecies.push(reactant);
+                }
             }
         });
-        return floatingSpecies;
+        return [floatingSpecies, boundaryFloatingSpecies];
     }
 
     checkIrreversibleProduct(speciesInKineticLaw, productList) {
@@ -266,7 +284,7 @@ class KineticLaw {
     }
 
     checkNamingConventions(parametersInKineticLaw, kineticsSim, idsList) {
-        var ret = {'k': [], 'v': []};
+        var ret = {'k': [], 'K': [], 'V': []};
         if (this.classificationCp["zerothOrder"]) {
             ret['k'] = this._checkSymbolsStartWith('k', parametersInKineticLaw);
         } else if (this.classificationCp["powerTerms"]) {
@@ -290,8 +308,8 @@ class KineticLaw {
                     eq1.push(param);
                 }
             });
-            ret['v'] = this._checkSymbolsStartWith('v', eq0);
-            ret['k'] = this._checkSymbolsStartWith('k', eq1);
+            ret['V'] = this._checkSymbolsStartWith('V', eq0);
+            ret['K'] = this._checkSymbolsStartWith('K', eq1);
         } else if (this.classificationCp["MMcat"]) {
             var eq = this._numeratorDenominator(kineticsSim, idsList);
             var eq0 = [];
@@ -303,8 +321,8 @@ class KineticLaw {
                     eq1.push(param);
                 }
             });
-            ret['k'] = this._checkSymbolsStartWith('k', eq0);
-            ret['k'] = this._checkSymbolsStartWith('k', eq1);
+            ret['K'] = this._checkSymbolsStartWith('K', eq0);
+            ret['K'] = this._checkSymbolsStartWith('K', eq1);
         } else if (this.classificationCp["Hill"]) {
             var eq = this._numeratorDenominator(kineticsSim, idsList);
             var eq0 = [];
@@ -316,7 +334,7 @@ class KineticLaw {
                     eq1.push(param);
                 }
             });
-            ret['k'] = this._checkSymbolsStartWith('k', eq1);
+            ret['K'] = this._checkSymbolsStartWith('K', eq1);
         } else if (this.classificationCp["Fraction"]) {
             
         } else if (this.classificationCp["Polynomial"]) {
@@ -450,6 +468,7 @@ class KineticLaw {
 
     /**
      * check if symbols in the list start with given start
+     * Case Sensitive
      * @param {String} start 
      * @param {[]} symbols 
      * @returns {[]} list of symbols not starting with given start
@@ -457,7 +476,7 @@ class KineticLaw {
     _checkSymbolsStartWith(start, symbols) {
         var ret = [];
         symbols.forEach(symbol => {
-            if (!symbol.toLowerCase().startsWith(start)) {
+            if (!symbol.startsWith(start)) {
                 ret.push(symbol);
             }
         });

@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/5.3.0/js/bootstrap.min.js" integrity="sha384-5n0eY3kH6cg3xgF5Z6AAoM6x0jzA6n9+3GdH/7u6g9FJs4Ck5BdPtF+to8xM6B5z" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   
   <script src="https://cdn.jsdelivr.net/pyodide/v0.22.1/full/pyodide.js"></script>
 
@@ -44,8 +45,12 @@
 
     const bioModelInput = document.getElementById('bioModelInput');
     bioModelInput.addEventListener('dblclick', searchAndHighlight);
+    bioModelInput.tabIndex = 0; // make div focusable
+    bioModelInput.addEventListener('keydown', goToNextResult);
+
 
     const sbml_output = document.getElementById('sbml_output');
+    sbml_output.addEventListener('dblclick', searchAndHighlightReverse);
     sbml_output.tabIndex = 0; // make div focusable
     sbml_output.addEventListener('keydown', goToNextResult);
 
@@ -83,17 +88,46 @@
 
       // Get the selected text
       searchWord = window.getSelection().toString();
-
+      var pattern = /^[A-Za-z_]/;
       // Remove previous highlights
       sbml_output.innerHTML = sbml_output.innerHTML.replace(/<mark class="highlight">|<\/mark>/g, '');
+      if (pattern.test(searchWord)) {
+        // Highlight all matches
+        const regex = new RegExp('\\b' + searchWord + '\\b', 'g');
+        sbml_output.innerHTML = sbml_output.innerHTML.replace(regex, '<mark class="highlight">' + searchWord + '</mark>');
 
-      // Highlight all matches
-      const regex = new RegExp(searchWord, 'g');
-      sbml_output.innerHTML = sbml_output.innerHTML.replace(regex, '<mark class="highlight">' + searchWord + '</mark>');
+        // Get all highlight elements
+        highlights = sbml_output.getElementsByClassName('highlight');
+        sbml_output.getElementsByClassName('highlight')[0].scrollIntoView({behavior: "smooth", block: "center"});
+      } else {
 
-      // Get all highlight elements
-      highlights = sbml_output.getElementsByClassName('highlight');
-      sbml_output.getElementsByClassName('highlight')[0].scrollIntoView({behavior: "smooth", block: "center"});
+      }
+    }
+
+    function searchAndHighlightReverse() {
+      const bioModelInput = document.getElementById('bioModelInput');
+      const sbml_output = document.getElementById('sbml_output');
+
+      const text = bioModelInput.value;
+
+      // Get the selected text
+      searchWord = window.getSelection().toString();
+      var pattern = /^[A-Za-z_]/;
+      // Remove previous highlights
+      if (pattern.test(searchWord)) {
+
+        const highlightedText = text.replace(
+          new RegExp(searchWord, 'gi'),
+          '<span class="highlight">$&</span>'
+        );
+        bioModelInput.innerHTML = highlightedText;
+
+        // Get all highlight elements
+        var highlights = bioModelInput.getElementsByClassName('highlight');
+        bioModelInput.getElementsByClassName('highlight')[0].scrollIntoView({behavior: "smooth", block: "center"});
+      } else {
+
+      }
     }
 
     function goToNextResult(event) {
@@ -198,6 +232,7 @@
             var loadInt = loadSBMLString(ptrSBMLCode);
             if (loadInt > 0) {
               document.getElementById("bioModelInput").value = getAntimonyString();
+              changeSBML(document.getElementById("bioModelInput").value, pyodide);
             } else {
               const outputBox = document.getElementById("sbml_output");
               outputBox.innerHTML = "";
@@ -211,6 +246,21 @@
             jsFree(ptrSBMLCode);
           } else {
             document.getElementById("bioModelInput").value = modelStr;
+            var ptrAntCode = jsAllocateUTF8(modelStr);
+            var loadInt = loadAntimonyString(ptrAntCode);
+            if (loadInt > 0) {
+              changeSBML(getSBMLString(), pyodide);
+            } else {
+              const outputBox = document.getElementById("sbml_output");
+              outputBox.innerHTML = "";
+
+              const errorMessage = document.createElement("div");
+              errorMessage.className = "error-message";
+              errorMessage.textContent = getLastError();
+
+              outputBox.appendChild(errorMessage);
+            }
+            jsFree(ptrAntCode);
           }
         },
         false
@@ -231,7 +281,7 @@
       }
     }
 
-    async function processFileInput() {
+    function processFileInput() {
       clearPreviousLoads();
       const fileInput = document.querySelector("input[type=file]");
       if (fileInput.files.length === 0) {
@@ -258,7 +308,7 @@
       }
     }
 
-    async function processTextInput() {
+    function processTextInput() {
       clearPreviousLoads();
       const modelStr = document.getElementById("bioModelInput").value;
       setLoading(true);
@@ -273,7 +323,12 @@
      * @param {object} pyodide - A Pyodide object used to create the ProcessSBML object.
      */
     function changeSBML(modelStr, pyodide) {
-      setLoading(true);
+      const outputBox = document.getElementById("sbml_output");
+      const loadingMessage = document.createElement("div");
+      loadingMessage.textContent = "loading...";
+      outputBox.innerHTML = "";
+      outputBox.appendChild(loadingMessage);
+
       // Declare variables
       var sbmlResult;
       var SBMLProcessor;
@@ -289,7 +344,6 @@
         if (loadInt > 0) {
           sbmlResult = getSBMLString();
         } else {
-          const outputBox = document.getElementById("sbml_output");
           outputBox.innerHTML = "";
 
           const errorMessage = document.createElement("div");
@@ -344,6 +398,7 @@
         const lines = ret.split("\n");
 
         // Iterate through the lines and create div elements for each line
+        var errorWarningCount = 0;
         lines.forEach((line) => {
           if (line.trim() === "") return;
 
@@ -351,13 +406,22 @@
 
           if (line.startsWith("Warning")) {
             messageDiv.className = "warning-message";
+            errorWarningCount++;
           } else if (line.startsWith("Error")) {
             messageDiv.className = "error-message";
+            errorWarningCount++;
           }
 
           messageDiv.textContent = line;
           outputBox.appendChild(messageDiv);
         });
+        
+        if (errorWarningCount === 0) {
+          const noErrorDiv = document.createElement("div");
+          noErrorDiv.className = "no-error-warning-message";
+          noErrorDiv.textContent = "No Error Or Warning Found!";
+          outputBox.prepend(noErrorDiv);
+        }
 
       } catch(err) {
         const outputBox = document.getElementById("sbml_output");
@@ -413,6 +477,18 @@
         alert("Error copying output to clipboard. Please try again.");
       }
     }
+
+    $(function () {
+      $('[data-bs-toggle="tooltip"]').tooltip();
+      $('#basic-error-check').click(function() {
+        if ($('#basic-error-check-icon').hasClass('fa-chevron-right')) {
+          $('#basic-error-check-icon').removeClass('fa-chevron-right').addClass('fa-chevron-down');
+        } else {
+          $('#basic-error-check-icon').removeClass('fa-chevron-down').addClass('fa-chevron-right');
+        }
+        $('#basic-error-check-list').toggle();
+      });
+    })
   </script>
 </head>
 
@@ -465,28 +541,33 @@
             <!-- Error code explanations -->
             <h5 style="background-color:#ff4d4d;">Error Codes:</h5>
             <p><strong>E001:</strong> No Rate Law entered<br> - The rate law is missing for the given reaction. Please provide a rate law to proceed.</p>
-            <p><strong>E002:</strong> Floating reactant<br> - The reaction contains floating reactants, which are not part of any rate law expression. Please ensure all reactants are included in the rate law expression.</p>
+            <p><strong>E002:</strong> Expecting reactant in rate law but not found<br> - The reaction contains floating reactants, which are not part of any rate law expression. Please ensure all reactants are included in the rate law expression.</p>
         
             <!-- Warning code explanations -->
             <h5 style="background-color:#ffcc00;">Warning Codes:</h5>
             <p><strong>W001:</strong> Rate law contains only number<br> - The rate law consists of only a numeric value. This is usually not a valid rate law for a reaction.</p>
             <p><strong>W002:</strong> Unrecognized rate law from the standard list<br> - The rate law provided does not match any of the recognized standard rate laws. Please verify the rate law and make sure it is in a supported format.</p>
-            <p><strong>W003:</strong> Irreversible reaction kinetic law contains products<br> - The rate law for an irreversible reaction should not include products. Please verify the rate law and adjust accordingly.</p>
             <p><strong>W004:</strong> Flux is not increasing as reactant increases<br> - The rate law contains reactant that has a non-positive relationship with the reaction flux. Note: some parameters might not be initialized or assigned a wrong value.</p>
             <p><strong>W015:</strong> Flux is not decreasing as product increases<br> - The rate law contains product that has a non-negative relationship with the reaction flux. Note: some parameters might not be initialized or assigned a wrong value.</p>
+            <p><strong>W016:</strong> Expecting boundary species reactant in rate law but not found<br> - The reaction contains boundary species reactants that are not part of any rate law expression. Please ensure all reactants are included in the rate law expression.</p>
+            <p><strong>W017:</strong> Expecting parameters to be constants<br> - The parameters in a rate law should be declared as constants in SBML.</p>
+            <h6>Reversibility:</h6>
+            <p><strong>W003:</strong> Irreversible reaction kinetic law contains products<br> - The rate law for an irreversible reaction should not include products. Please verify the rate law and adjust accordingly.</p>
             <h6>Naming Conventions:</h6>
             <p><strong>W005:</strong> We recommend that these parameters start with 'k'<br> - Certain parameters in the rate law are not following the recommended naming convention (starting with 'k'). Consider renaming these parameters to improve readability.</p>
-            <p><strong>W006:</strong> We recommend that these parameters start with 'v'<br> - Certain parameters in the rate law are not following the recommended naming convention (starting with 'v'). Consider renaming these parameters to improve readability.</p>
+            <p><strong>W006:</strong> We recommend that these parameters start with 'K'<br> - Certain parameters in the rate law are not following the recommended naming convention (starting with 'K'). Consider renaming these parameters to improve readability.</p>
+            <p><strong>W007:</strong> We recommend that these parameters start with 'V'<br> - Certain parameters in the rate law are not following the recommended naming convention (starting with 'V'). Consider renaming these parameters to improve readability.</p>
             <h6>Formatting Conventions:</h6>
-            <p><strong>W007:</strong> Elements of the same type are not ordered properly <br> - Compartments and parameters are not in alphabetical order, or species are of different order as they appear in the reaction. Reordering the elements can improve readability and consistency.</p>
-            <p><strong>W008:</strong> Formatting convention not followed (compartment before parameters before species)<br> - The rate law does not follow the recommended formatting convention, which suggests placing compartments before parameters and species. Adjust the rate law to adhere to this convention for better readability and consistency.</p>
-            <p><strong>W009:</strong> Denominator not in alphabetical order<br> - The denominator in the rate law is not ordered alphabetically. Reordering the elements can improve readability and consistency.</p>
-            <p><strong>W010:</strong> Numerator and denominator not in alphabetical order<br> - Both the numerator and denominator in the rate law are not ordered alphabetically. Reordering the elements can improve readability and consistency.</p>
-            <p><strong>W011:</strong> Numerator convention not followed and denominator not in alphabetical order<br> - The numerator in the rate law does not follow the recommended formatting convention and the denominator is not ordered alphabetically. Adjust the rate law to adhere to these conventions for better readability and consistency.</p>
-            <p><strong>W012:</strong> Denominator convention not followed<br> - The denominator in the rate law does not follow the recommended formatting convention. Adjust the rate law to adhere to this convention for better readability and consistency.</p>
-            <p><strong>W013:</strong> Numerator not in alphabetical order and denominator convention not followed<br> - The numerator in the rate law is not ordered alphabetically and the denominator does not follow the recommended formatting convention. Adjust the rate law to adhere to these conventions for better readability and consistency.</p>
-            <p><strong>W014:</strong> Numerator and denominator convention not followed<br> - Both the numerator and denominator in the rate law do not follow the recommended formatting convention. Adjust the rate law to adhere to this convention for better readability and consistency.</p>
-          </div>
+            <p><strong>W008:</strong> Elements of the same type are not ordered properly<br> - Compartments and parameters are not in alphabetical order, or species are of different order as they appear in the reaction. Reordering the elements can improve readability and consistency.</p>
+            <p><strong>W009:</strong> Formatting convention not followed (compartment before parameters before species)<br> - The rate law does not follow the recommended formatting convention, which suggests placing compartments before parameters and species. Adjust the rate law to adhere to this convention for better readability and consistency.</p>
+            <p><strong>W010:</strong> Denominator not in alphabetical order<br> - The denominator in the rate law is not ordered alphabetically. Reordering the elements can improve readability and consistency.</p>
+            <p><strong>W011:</strong> Numerator and denominator not in alphabetical order<br> - Both the numerator and denominator in the rate law are not ordered alphabetically. Reordering the elements can improve readability and consistency.</p>
+            <p><strong>W012:</strong> Numerator convention not followed and denominator not in alphabetical order<br> - The numerator in the rate law does not follow the recommended formatting convention and the denominator is not ordered alphabetically. Adjust the rate law to adhere to these conventions for better readability and consistency.</p>
+            <p><strong>W013:</strong> Denominator convention not followed<br> - The denominator in the rate law does not follow the recommended formatting convention. Adjust the rate law to adhere to this convention for better readability and consistency.</p>
+            <p><strong>W014:</strong> Numerator not in alphabetical order and denominator convention not followed<br> - The numerator in the rate law is not ordered alphabetically and the denominator does not follow the recommended formatting convention. Adjust the rate law to adhere to these conventions for better readability and consistency.</p>
+            <p><strong>W015:</strong> Numerator and denominator convention not followed<br> - Both the numerator and denominator in the rate law do not follow the recommended formatting convention. Adjust the rate law to adhere to this convention for better readability and consistency.</p>
+        </div>
+        
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
           </div>
@@ -512,8 +593,8 @@
           <textarea id="bioModelInput" class="form-control" rows="6" placeholder="[Antimony code here.]"></textarea>
         </div>
 
-        <div>
-          <label for="font-size-range">Adjust font size:</label>
+        <div style="display: flex; align-items: center;">
+          <label for="font-size-range" style="margin-right: 10px;">Font:</label>
           <input type="range" id="font-size-range" min="0.5" max="3" step="0.1" value="1" oninput="adjustInputFontSize(value)" style="width: 100%;">
         </div>
 
@@ -523,28 +604,54 @@
           <span id="copy-input-tooltip" style="visibility: hidden; opacity: 0; transition: visibility 0s, opacity 0.5s linear;">Copied to clipboard!</span>
         </div>
 
-        <div class="d-flex align-items-center mb-3">
+        <div id="basic-error-check-container">
+          <div id="basic-error-check" class="basic-error-check" style="cursor: pointer;">
+            <i id="basic-error-check-icon" class="fas fa-chevron-right"></i>
+            <span>&nbsp;Basic Error Checks</span>
+          </div>
+          <div id="basic-error-check-list" style="display: none; margin-left: 2em;">
+            <div class="basic-error-check-item">
+              <input type="checkbox" checked disabled>
+              <span class="info-tooltip" data-bs-toggle="tooltip" data-bs-placement="right" title="Checks if rate laws commonly used are entered.">Common Rate Law Check</span>
+            </div>
+            <div class="basic-error-check-item">
+              <input type="checkbox" checked disabled>
+              <span class="info-tooltip" data-bs-toggle="tooltip" data-bs-placement="right" title="Checks if any parameter values are non constants.">Constant Parameter Check</span>
+            </div>
+            <div class="basic-error-check-item">
+              <input type="checkbox" checked disabled>
+              <span class="info-tooltip" data-bs-toggle="tooltip" data-bs-placement="right" title="Checks if any rate law is missing a reactant.">Floating Species Check</span>
+            </div>
+            <div class="basic-error-check-item">
+              <input type="checkbox" checked disabled>
+              <span class="info-tooltip" data-bs-toggle="tooltip" data-bs-placement="right" title="Checks if the rate is positive.">Positive Flux Check</span>
+            </div>
+            <div class="basic-error-check-item">
+              <input type="checkbox" checked disabled>
+              <span class="info-tooltip" data-bs-toggle="tooltip" data-bs-placement="right" title="Checks if the annotations within the model are consistent with the rate law entered.">Annotation Check</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="basic-error-check-item">
           <div style="flex: 1;">
             <input type="checkbox" id="reversibilityCheck" name="reversibilityCheck">
-            <label for="reversibilityCheck">Reversibility Check</label>
+            <label for="reversibilityCheck" data-bs-toggle="tooltip" data-bs-placement="right" title="Warns when irreversible reaction rate law includes any product.">Reversibility Check</label>
           </div>
-          <span class="info-tooltip" data-bs-toggle="tooltip" data-bs-placement="right" title="Warns when irreversible reaction rate law includes any product."><i class="fas fa-info"></i></span>
         </div>
         
-        <div class="d-flex align-items-center mb-3">
+        <div class="basic-error-check-item">
           <div style="flex: 1;">
             <input type="checkbox" id="namingConvention" name="namingConvention">
-            <label for="namingConvention">Naming Convention Check</label>
+            <label for="namingConvention" data-bs-toggle="tooltip" data-bs-placement="right" title="Warns when a symbol name is not common.">Naming Convention Check</label>
           </div>
-          <span class="info-tooltip" data-bs-toggle="tooltip" data-bs-placement="right" title="Warns when a symbol name is not common."><i class="fas fa-info"></i></span>
         </div>
         
-        <div class="d-flex align-items-center mb-3">
+        <div class="basic-error-check-item">
           <div style="flex: 1;">
             <input type="checkbox" id="formattingConvention" name="formattingConvention">
-            <label for="formattingConvention">Formatting Convention Check</label>
+            <label for="formattingConvention" data-bs-toggle="tooltip" data-bs-placement="right" title="Warns when symbols are not ordered conventionally.">Formatting Convention Check</label>
           </div>
-          <span class="info-tooltip" data-bs-toggle="tooltip" data-bs-placement="right" title="Warns when symbols are not ordered conventionally."><i class="fas fa-info"></i></span>
         </div>
       </div>
       <div class="col-md-6">
@@ -555,12 +662,12 @@
         <div class="output-container">
           <div id="sbml_output" class="output-box" style="font-size: 1rem;"></div>
         </div>
-        <button id="copyToClipboard" class="btn btn-secondary mt-3" onclick="copyToClipboard()">Copy to Clipboard</button>
         <span id="copy-tooltip" style="visibility: hidden; opacity: 0; transition: visibility 0s, opacity 0.5s linear;">Copied to clipboard!</span>
-        <div>
-          <label for="font-size-range">Adjust font size:</label>
+        <div style="display: flex; align-items: center;">
+          <label for="font-size-range" style="margin-right: 10px;">Font:</label>
           <input type="range" id="font-size-range" min="0.5" max="3" step="0.1" value="1" oninput="adjustFontSize(value)" style="width: 100%;">
-        </div>
+        </div>    
+        <button id="copyToClipboard" class="btn btn-secondary mt-3" onclick="copyToClipboard()">Copy to Clipboard</button>    
       </div>
     </div>
   </div>

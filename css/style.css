@@ -30,7 +30,8 @@ textarea {
 }
 
 .warning-message,
-.error-message {
+.error-message,
+.no-error-warning-message {
   padding: 4px;
   border-radius: 3px;
 }
@@ -41,6 +42,10 @@ textarea {
 
 .error-message {
   background-color: #ff4d4d;
+}
+
+.no-error-warning-message {
+  background-color: rgb(13, 167, 13);
 }
 
 /* Night mode */

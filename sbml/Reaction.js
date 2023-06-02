@@ -3,17 +3,30 @@ class Reaction {
     constructor( libsbmlModel, libsbmlReaction, functionDefinitions, pyodide, processSBML, checks ) {
         this.reaction = libsbmlReaction;
         console.log(this.reaction)
+        this.boundarySpeciesList = [];
+
         this.reactantList = [];
         var i;
         for (i = 0; i < this.reaction.getNumReactants(); i++) {
-            var reactant = this.reaction.getReactant(i);
-            this.reactantList.push(reactant.getSpecies());
+            const reactant = this.reaction.getReactant(i);
+            const reactantName = reactant.getSpecies()
+            this.reactantList.push(reactantName);
+            const libsbmlSpecies = libsbmlModel.getSpecies(reactantName);
+            if (libsbmlSpecies.getBoundaryCondition()) {
+                this.boundarySpeciesList.push(reactantName);
+            }
         }
         this.productList = [];
         for (i = 0; i < this.reaction.getNumProducts(); i++) {
-            var product = this.reaction.getProduct(i)
-            this.productList.push(product.getSpecies());
+            const product = this.reaction.getProduct(i);
+            const productName = product.getSpecies();
+            this.productList.push(productName);
+            const libsbmlSpecies = libsbmlModel.getSpecies(productName);
+            if (libsbmlSpecies.getBoundaryCondition()) {
+                this.boundarySpeciesList.push(productName);
+            }
         }
+        
         this.sortedSpeciesList = this.reactantList.concat(this.productList);
         this.id = this.reaction.getId();
         this.kineticLaw = new KineticLaw(libsbmlModel, libsbmlReaction, this.reaction.getKineticLaw(), this, functionDefinitions, pyodide, processSBML, checks);
@@ -56,7 +69,10 @@ class Reaction {
             ret += "\nWarning W001: Rate law contains only number";
         } else {
             if (this.kineticLaw.analysis["floatingSpecies"].length > 0) {
-                ret += `\nError E002: Floating reactant: ${this.kineticLaw.analysis["floatingSpecies"].toString()}`;
+                ret += `\nError E002: Expecting reactant in rate law but not found: ${this.kineticLaw.analysis["floatingSpecies"].toString()}`;
+            }
+            if (this.kineticLaw.analysis["boundaryFloatingSpecies"].length > 0) {
+                ret += `\nWarning W016: Expecting boundary species reactant in rate law but not found: ${this.kineticLaw.analysis["boundaryFloatingSpecies"].toString()}`
             }
             if (!(
                 this.kineticLaw.classificationCp["zerothOrder"] ||
@@ -84,36 +100,39 @@ class Reaction {
             if (this.kineticLaw.analysis["namingConvention"]['k'].length > 0) {
                 ret += `\nWarning W005: We recommend that these parameters start with 'k': ${this.kineticLaw.analysis["namingConvention"]['k'].toString()}`;
             }
-            if (this.kineticLaw.analysis["namingConvention"]['v'].length > 0) {
-                ret += `\nWarning W006: We recommend that these parameters start with 'v': ${this.kineticLaw.analysis["namingConvention"]['v'].toString()}`;
+            if (this.kineticLaw.analysis["namingConvention"]['K'].length > 0) {
+                ret += `\nWarning W006: We recommend that these parameters start with 'K': ${this.kineticLaw.analysis["namingConvention"]['k'].toString()}`;
+            }
+            if (this.kineticLaw.analysis["namingConvention"]['V'].length > 0) {
+                ret += `\nWarning W007: We recommend that these parameters start with 'V': ${this.kineticLaw.analysis["namingConvention"]['v'].toString()}`;
             }
             switch (this.kineticLaw.analysis["formattingConvention"]) {
                 case 0:
                     // Formatted correctly, no warning needed
                     break;
                 case 1:
-                    ret += "\nWarning W007: Elements of the same type are not ordered properly.";
+                    ret += "\nWarning W008: Elements of the same type are not ordered properly.";
                     break;
                 case 2:
-                    ret += "\nWarning W008: Formatting convention not followed (compartment before parameters before species).";
+                    ret += "\nWarning W009: Formatting convention not followed (compartment before parameters before species).";
                     break;
                 case 3:
-                    ret += "\nWarning W009: Denominator not in alphabetical order.";
+                    ret += "\nWarning W010: Denominator not in alphabetical order.";
                     break;
                 case 4:
-                    ret += "\nWarning W010: Numerator and denominator not in alphabetical order.";
+                    ret += "\nWarning W011: Numerator and denominator not in alphabetical order.";
                     break;
                 case 5:
-                    ret += "\nWarning W011: Numerator convention not followed and denominator not in alphabetical order.";
+                    ret += "\nWarning W012: Numerator convention not followed and denominator not in alphabetical order.";
                     break;
                 case 6:
-                    ret += "\nWarning W012: Denominator convention not followed.";
+                    ret += "\nWarning W013: Denominator convention not followed.";
                     break;
                 case 7:
-                    ret += "\nWarning W013: Numerator not in alphabetical order and denominator convention not followed.";
+                    ret += "\nWarning W014: Numerator not in alphabetical order and denominator convention not followed.";
                     break;
                 case 8:
-                    ret += "\nWarning W014: Numerator and denominator convention not followed.";
+                    ret += "\nWarning W015: Numerator and denominator convention not followed.";
                     break;
                 default:
                     // Unhandled case, add an appropriate message if needed
