@@ -64,9 +64,9 @@ class Reaction {
         }
         var ret = `${reactantStr} ${reactionArrow} ${productStr}; ${kineticStr}`;
         if (this.kineticLaw.analysis["emptyRateLaw"]) {
-            ret += "\nError E001: No Rate Law entered";
+            ret += E001;
         } else if (this.kineticLaw.analysis["pureNumber"]) {
-            ret += "\nWarning W001: Rate law contains only number";
+            ret += W001;
         } else {
             if (this.kineticLaw.analysis["floatingSpecies"].length > 0) {
                 ret += `\nError E002: Expecting reactant in rate law but not found: ${this.kineticLaw.analysis["floatingSpecies"].toString()}`;
@@ -138,6 +138,33 @@ class Reaction {
                     // Unhandled case, add an appropriate message if needed
                     break;
             }
+            if (this.kineticLaw.analysis["nonConstParams"].length > 0) {
+                ret += `\nWarning W017: Expecting these parameters to be constants: ${this.kineticLaw.analysis["nonConstParams"].toString()}`
+            }
+            switch (this.kineticLaw.analysis["annotation"]) {
+                case 0:
+                    // Formatted correctly, no warning needed
+                    break;
+                case 1:
+                    ret += "\nWarning W018: Uni-directional mass action annotation not following recommended SBO terms, we recommend annotations to be subclasses of: SBO_0000430, SBO_0000041.";
+                    break;
+                case 2:
+                    ret += "\nWarning W019: Uni-term with the moderator annotation not following recommended SBO terms, we recommend annotations to be subclasses of: SBO_0000041.";
+                    break;
+                case 3:
+                    ret += "\nWarning W020: Bi-directional mass action or Bi-terms with the moderator annotation not following recommended SBO terms, we recommend annotations to be subclasses of: SBO_0000042.";
+                    break;
+                case 4:
+                    ret += "\nWarning W021: Michaelis-Menten kinetics without an explicit enzyme annotation not following recommended SBO terms, we recommend annotations to be subclasses of: SBO_0000028.";
+                    break;
+                case 5:
+                    ret += "\nWarning W022: Michaelis-Menten kinetics with an explicit enzyme annotation not following recommended SBO terms, we recommend annotations to be subclasses of: SBO_0000028, SBO_0000430.";
+                    break;
+                default:
+                    // Unhandled case, add an appropriate message if needed
+                    break;
+            }
+
         }
         return ret;
     }

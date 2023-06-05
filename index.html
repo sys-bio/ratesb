@@ -106,27 +106,34 @@
 
     function searchAndHighlightReverse() {
       const bioModelInput = document.getElementById('bioModelInput');
-      const sbml_output = document.getElementById('sbml_output');
 
-      const text = bioModelInput.value;
+      let text = bioModelInput.innerHTML;
+
+      // Remove previous highlights
+      let regEx = /<span class="highlight">(.*?)<\/span>/gi;
+      text = text.replace(regEx, "$1");
+
+      bioModelInput.innerHTML = text;
+
+      text = bioModelInput.innerText;
 
       // Get the selected text
-      searchWord = window.getSelection().toString();
+      var searchWord = window.getSelection().toString();
       var pattern = /^[A-Za-z_]/;
-      // Remove previous highlights
-      if (pattern.test(searchWord)) {
 
+      // Apply new highlights
+      if (pattern.test(searchWord)) {
         const highlightedText = text.replace(
-          new RegExp(searchWord, 'gi'),
+          new RegExp('\\b' + searchWord + '\\b', 'gi'),
           '<span class="highlight">$&</span>'
         );
         bioModelInput.innerHTML = highlightedText;
 
         // Get all highlight elements
         var highlights = bioModelInput.getElementsByClassName('highlight');
-        bioModelInput.getElementsByClassName('highlight')[0].scrollIntoView({behavior: "smooth", block: "center"});
-      } else {
-
+        if (highlights.length > 0) {
+          highlights[0].scrollIntoView({behavior: "smooth", block: "center"});
+        }
       }
     }
 
@@ -231,8 +238,8 @@
             var ptrSBMLCode = jsAllocateUTF8(modelStr);
             var loadInt = loadSBMLString(ptrSBMLCode);
             if (loadInt > 0) {
-              document.getElementById("bioModelInput").value = getAntimonyString();
-              changeSBML(document.getElementById("bioModelInput").value, pyodide);
+              document.getElementById("bioModelInput").innerText = getAntimonyString();
+              changeSBML(document.getElementById("bioModelInput").innerText, pyodide);
             } else {
               const outputBox = document.getElementById("sbml_output");
               outputBox.innerHTML = "";
@@ -245,7 +252,7 @@
             }
             jsFree(ptrSBMLCode);
           } else {
-            document.getElementById("bioModelInput").value = modelStr;
+            document.getElementById("bioModelInput").innerText = modelStr;
             var ptrAntCode = jsAllocateUTF8(modelStr);
             var loadInt = loadAntimonyString(ptrAntCode);
             if (loadInt > 0) {
@@ -310,7 +317,7 @@
 
     function processTextInput() {
       clearPreviousLoads();
-      const modelStr = document.getElementById("bioModelInput").value;
+      const modelStr = document.getElementById("bioModelInput").innerText;
       setLoading(true);
       changeSBML(modelStr, pyodide);
       setLoading(false);
@@ -324,10 +331,7 @@
      */
     function changeSBML(modelStr, pyodide) {
       const outputBox = document.getElementById("sbml_output");
-      const loadingMessage = document.createElement("div");
-      loadingMessage.textContent = "loading...";
       outputBox.innerHTML = "";
-      outputBox.appendChild(loadingMessage);
 
       // Declare variables
       var sbmlResult;
@@ -441,7 +445,7 @@
       const inputElement = document.getElementById("bioModelInput");
       const tooltip = document.getElementById("copy-input-tooltip");
       try {
-        await navigator.clipboard.writeText(inputElement.value);
+        await navigator.clipboard.writeText(inputElement.innerText);
         // Show the tooltip
         tooltip.style.visibility = "visible";
         tooltip.style.opacity = "1";
@@ -522,6 +526,7 @@
             <p>"Analyze File" button analyzes the file directly.</p>
             <p>"Analyze Model" button analyzes the Antimony text in the text box.</p>
             <p>When double clicking on a word in the left text box, find all instances of that word in the right-side output box and highlight them. You can then use the Tab key to navigate through each highlighted instance.</p>
+            <p>Currently, annotation check only works after the first load.</p>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -566,6 +571,12 @@
             <p><strong>W013:</strong> Denominator convention not followed<br> - The denominator in the rate law does not follow the recommended formatting convention. Adjust the rate law to adhere to this convention for better readability and consistency.</p>
             <p><strong>W014:</strong> Numerator not in alphabetical order and denominator convention not followed<br> - The numerator in the rate law is not ordered alphabetically and the denominator does not follow the recommended formatting convention. Adjust the rate law to adhere to these conventions for better readability and consistency.</p>
             <p><strong>W015:</strong> Numerator and denominator convention not followed<br> - Both the numerator and denominator in the rate law do not follow the recommended formatting convention. Adjust the rate law to adhere to this convention for better readability and consistency.</p>
+            <h6>SBOTerm Annotations:</h6>
+            <p><strong>W018:</strong> Uni-directional mass action annotation not following recommended SBO terms<br> - We recommend annotations to be subclasses of: SBO_0000430, SBO_0000041.</p>
+            <p><strong>W019:</strong> Uni-term with the moderator annotation not following recommended SBO terms<br> - We recommend annotations to be subclasses of: SBO_0000041.</p>
+            <p><strong>W020:</strong> Bi-directional mass action or Bi-terms with the moderator annotation not following recommended SBO terms<br> - We recommend annotations to be subclasses of: SBO_0000042.</p>
+            <p><strong>W021:</strong> Michaelis-Menten kinetics without an explicit enzyme annotation not following recommended SBO terms<br> - We recommend annotations to be subclasses of: SBO_0000028.</p>
+            <p><strong>W022:</strong> Michaelis-Menten kinetics with an explicit enzyme annotation not following recommended SBO terms<br> - We recommend annotations to be subclasses of: SBO_0000028, SBO_0000430.</p>
         </div>
         
           <div class="modal-footer">
@@ -590,7 +601,7 @@
         </div>
 
         <div class="mb-3">
-          <textarea id="bioModelInput" class="form-control" rows="6" placeholder="[Antimony code here.]"></textarea>
+          <div id="bioModelInput" class="form-control" contenteditable="true" style="min-height:100px; overflow:auto; white-space: pre-wrap;"></div>
         </div>
 
         <div style="display: flex; align-items: center;">

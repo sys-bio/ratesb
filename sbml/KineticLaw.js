@@ -6,7 +6,6 @@ class KineticLaw {
         this.libsbmlReaction = libsbmlReaction;
         this.pyodide = pyodide;
         this.libsbmlKinetics = libsbmlKinetics;
-        console.log(this.libsbmlKinetics);
         this.formula = this.libsbmlKinetics.getFormula();
         this.reaction = reaction;
         this.model = processSBML;
@@ -142,6 +141,8 @@ class KineticLaw {
         } else {
             this.analysis["formattingConvention"] = 0;
         }
+        this.analysis["annotation"] = this.checkAnnotation();
+        this.analysis["nonConstParams"] = this.constParamCheck(parametersInKineticLawOnly);
         this.assignPythonSymbols();
     }
 
@@ -379,6 +380,66 @@ class KineticLaw {
             ret = this._checkExpressionFormat(kinetics, compartmentInKineticLaw, parametersInKineticLawOnly);
         }
         return ret;
+    }
+
+    /**
+     * This function checks the SBOTerm annotation against various sets of 
+     * acceptable terms for different rate law types in systems biology.
+     *
+     * The function checks whether the term belongs to a particular set of SBO terms, 
+     * representing different rate law types (UNDR, UNMO, BIDR, BIMO, MM, MMCAT). 
+     * If the term doesn't belong to the corresponding set for the detected type, 
+     * the function will return a unique warning code associated with each rate law type.
+     * 
+     * If the term is found within the respective set of terms, the function will return 0,
+     * indicating no issues found.
+     * 
+     * @returns {number} - Returns 0 if the SBOTerm is in the corresponding set. 
+     * Otherwise, returns a unique number representing the type of issue (1-5).
+     */
+    checkAnnotation() {
+        const sboTerm = this.libsbmlKinetics.getSBOTerm();
+        if (sboTerm < 0) {
+            return 0;
+        }
+        if (this.classificationCp["UNDR"]) {
+            const undrSBOs = [41, 43, 44, 45, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 140, 141, 142, 143, 144, 145, 146, 163, 166, 333, 560, 561, 562, 563, 564, 430, 270, 458, 275, 273, 379, 440, 443, 451, 454, 456, 260, 271, 378, 387, 262, 265, 276, 441, 267, 274, 444, 452, 453, 455, 457, 386, 388, 442, 277, 445, 446, 447, 448, 266, 449, 450];
+            if (!undrSBOs.includes(sboTerm)) {
+                return 1;
+            }
+        } else if (this.classificationCp["UNMO"]) {
+            const unmoSBOs = [41, 43, 44, 45, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 140, 141, 142, 143, 144, 145, 146, 163, 166, 333, 560, 561, 562, 563, 564];
+            if (!unmoSBOs.includes(sboTerm)) {
+                return 2;
+            }
+        } else if (this.classificationCp["BIDR"] || this.classificationCp["BIMO"]) {
+            const biSBOs = [42, 69, 78, 88, 109, 646, 70, 71, 74, 79, 80, 81, 84, 89, 99, 110, 120, 130, 72, 73, 75, 76, 77, 82, 83, 85, 86, 87, 90, 91, 92, 95, 100, 101, 102, 105, 111, 112, 113, 116, 121, 122, 123, 126, 131, 132, 133, 136, 93, 94, 96, 97, 98, 103, 104, 106, 107, 108, 114, 115, 117, 118, 119, 124, 125, 127, 128, 129, 134, 135, 137, 138, 139];
+            if (!biSBOs.includes(sboTerm)) {
+                return 3;
+            }
+        } else if (this.classificationCp["MM"]) {
+            const mmSBOs = [28, 29, 30, 31, 199];
+            if (!mmSBOs.includes(sboTerm)) {
+                return 4;
+            }
+        } else if (this.classificationCp["MMcat"]) {
+            const mmcatSBOs = [28, 29, 30, 31, 199, 430, 270, 458, 275, 273, 379, 440, 443, 451, 454, 456, 260, 271, 378, 387, 262, 265, 276, 441, 267, 274, 444, 452, 453, 455, 457, 386, 388, 442, 277, 445, 446, 447, 448, 266, 449, 450];
+            if (!mmcatSBOs.includes(sboTerm)) {
+                return 5;
+            }
+        }
+        return 0;
+    }
+
+    constParamCheck(parametersInKineticLawOnly) {
+        const nonConstParams = [];
+        parametersInKineticLawOnly.forEach(param => {
+            const libsbmlParam = this.libsbmlModel.getParameter(param);
+            if (!libsbmlParam.getConstant()) {
+                nonConstParams.push(param);
+            }
+        });
+        return nonConstParams;
     }
 
     escapeRegex(string) {
