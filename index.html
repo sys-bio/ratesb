@@ -597,20 +597,20 @@
           </label>
       </div>
         <div class="mb-3">
-          <button id="ClickMe" class="btn btn-primary" onclick="processFileInput()">Analyze File</button>
+          <button id="ClickMe" class="btn btn-primary" data-bs-toggle="tooltip" data-bs-placement="right" onclick="processFileInput()" title="Click to analyze the file">Analyze File</button>
         </div>
-
+      
         <div class="mb-3">
           <div id="bioModelInput" class="form-control" contenteditable="true" style="min-height:100px; overflow:auto; white-space: pre-wrap;"></div>
         </div>
 
-        <div style="display: flex; align-items: center;">
+        <div style="display: flex; align-items: center; margin-top: -15px; margin-bottom: 10px;">
           <label for="font-size-range" style="margin-right: 10px;">Font:</label>
           <input type="range" id="font-size-range" min="0.5" max="3" step="0.1" value="1" oninput="adjustInputFontSize(value)" style="width: 100%;">
         </div>
 
         <div class="mb-3">
-          <button id="ClickMe" class="btn btn-primary" onclick="processTextInput()">Analyze Model</button>
+          <button id="ClickMe" class="btn btn-primary" data-bs-toggle="tooltip" data-bs-placement="right" onclick="processTextInput()" title="Click to analyze the model in the text box">Analyze Model</button>
           <button id="copyInputToClipboard" class="btn btn-secondary" onclick="copyInputToClipboard()">Copy to Clipboard</button>
           <span id="copy-input-tooltip" style="visibility: hidden; opacity: 0; transition: visibility 0s, opacity 0.5s linear;">Copied to clipboard!</span>
         </div>
@@ -674,7 +674,7 @@
           <div id="sbml_output" class="output-box" style="font-size: 1rem;"></div>
         </div>
         <span id="copy-tooltip" style="visibility: hidden; opacity: 0; transition: visibility 0s, opacity 0.5s linear;">Copied to clipboard!</span>
-        <div style="display: flex; align-items: center;">
+        <div style="display: flex; align-items: center; margin-top: -20px;">
           <label for="font-size-range" style="margin-right: 10px;">Font:</label>
           <input type="range" id="font-size-range" min="0.5" max="3" step="0.1" value="1" oninput="adjustFontSize(value)" style="width: 100%;">
         </div>    
