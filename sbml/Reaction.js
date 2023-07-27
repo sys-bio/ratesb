@@ -101,10 +101,10 @@ class Reaction {
                 ret += `\nWarning W005: We recommend that these parameters start with 'k': ${this.kineticLaw.analysis["namingConvention"]['k'].toString()}`;
             }
             if (this.kineticLaw.analysis["namingConvention"]['K'].length > 0) {
-                ret += `\nWarning W006: We recommend that these parameters start with 'K': ${this.kineticLaw.analysis["namingConvention"]['k'].toString()}`;
+                ret += `\nWarning W006: We recommend that these parameters start with 'K': ${this.kineticLaw.analysis["namingConvention"]['K'].toString()}`;
             }
             if (this.kineticLaw.analysis["namingConvention"]['V'].length > 0) {
-                ret += `\nWarning W007: We recommend that these parameters start with 'V': ${this.kineticLaw.analysis["namingConvention"]['v'].toString()}`;
+                ret += `\nWarning W007: We recommend that these parameters start with 'V': ${this.kineticLaw.analysis["namingConvention"]['V'].toString()}`;
             }
             switch (this.kineticLaw.analysis["formattingConvention"]) {
                 case 0:

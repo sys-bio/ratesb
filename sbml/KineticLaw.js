@@ -373,13 +373,28 @@ class KineticLaw {
             this.classificationCp["Hill"] ||
             this.classificationCp["Fraction"]
             ) {
-            var eq = this._numeratorDenominator(kineticsSim, idsList);
+            var eq = this.splitFraction(kinetics);
+            var eq0 = eq[0];
+            var eq1 = eq[1];
             ret = this._checkExpressionFormat(eq0, compartmentInKineticLaw, parametersInKineticLawOnly);
             ret += 3 * this._checkExpressionFormat(eq1, compartmentInKineticLaw, parametersInKineticLawOnly);
         } else {
             ret = this._checkExpressionFormat(kinetics, compartmentInKineticLaw, parametersInKineticLawOnly);
         }
         return ret;
+    }
+
+    splitFraction(fractionString) {
+        // Split the fraction at the '/' character
+        let splitFraction = fractionString.split('/');
+    
+        // Check if there's a numerator and a denominator
+        if (splitFraction.length !== 2) {
+            return ['',''];
+        }
+    
+        // Return the numerator and the denominator as an object
+        return [splitFraction[0].trim(), splitFraction[1].trim()];
     }
 
     /**
