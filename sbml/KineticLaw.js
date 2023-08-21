@@ -1,7 +1,7 @@
 /** Provides Information on SBML Kinetics Laws */
 
 class KineticLaw {
-    constructor( libsbmlModel, libsbmlReaction, libsbmlKinetics, reaction, functionDefinitions, pyodide, processSBML, checks) {
+    constructor( libsbmlModel, libsbmlReaction, libsbmlKinetics, reaction, functionDefinitions, pyodide, processSBML, checks, customClassificationList) {
         this.libsbmlModel = libsbmlModel;
         this.libsbmlReaction = libsbmlReaction;
         this.pyodide = pyodide;
@@ -9,6 +9,7 @@ class KineticLaw {
         this.formula = this.libsbmlKinetics.getFormula();
         this.reaction = reaction;
         this.model = processSBML;
+        this.customClassificationList = customClassificationList;
         this._curDepth = 0;
         try {
             this.symbols = this._getSymbols();
@@ -30,6 +31,7 @@ class KineticLaw {
         }
         this.sympyFormula = this.expandedFormula.replaceAll("^", "**");
         this.classificationCp = {};
+        this.customClassification = [];
         this.analysis = {};
         this.checks = checks;
         if (this.formula.replace(/\s/g, '').length) {
@@ -95,7 +97,7 @@ class KineticLaw {
             js.kineticsSim = kineticsSim
         `);
         console.log(kineticsSim);
-        if ((typeof kineticsSim) !== "number") {
+        if (isNaN(kineticsSim)) {
             this.analysis["pureNumber"] = false;
             var reactantList = this.reaction.reactantList;
             var productList = this.reaction.productList;
@@ -113,12 +115,201 @@ class KineticLaw {
             this.classificationCp["Fraction"] = this.isFraction(kineticsSim, idsList, speciesInKineticLaw);
             this.classificationCp["Polynomial"] = this.isPolynomial(kineticsSim, idsList, speciesInKineticLaw);
     
+            this.customClassification = this.customClassify(reactantList, productList, kineticsSim, idsList, speciesInKineticLaw, parametersInKineticLawOnly, compartmentInKineticLaw);
             console.log(this.classificationCp);
+            console.log(this.customClassification);
             this.kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLawOnly, compartmentInKineticLaw, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList);
         } else {
             this.analysis["pureNumber"] = true;
         }
     }
+
+    customClassify(reactantList, productList, kineticsSim, idsList, speciesInKineticLaw, parametersInKineticLawOnly, compartmentInKineticLaw) {
+        function permute(arr) {
+            // Base case: if the array has only one element, return it as a single-item permutation
+            if (arr.length === 1) {
+              return [arr];
+            }
+          
+            // Array to store all permutations
+            const permutations = [];
+          
+            // Iterate over each element in the array
+            arr.forEach((element, index) => {
+              // Create a copy of the array without the current element
+              const remaining = [...arr.slice(0, index), ...arr.slice(index + 1)];
+          
+              // Generate permutations of the remaining elements
+              const subPermutations = permute(remaining);
+          
+              // Add the current element to the beginning of each sub-permutation
+              const mappedPermutations = subPermutations.map(subPermutation => [element, ...subPermutation]);
+          
+              // Add the mapped permutations to the main list
+              permutations.push(...mappedPermutations);
+            });
+          
+            return permutations;
+        }
+
+        function replaceOccurrences(reactantsInKineticLaw, productsInKineticLaw, enzymeList, compartmentInKineticLaw, parametersInKineticLawOnly, kineticsSim) {
+            const permutedReactants = permute(reactantsInKineticLaw);
+            const permutedProducts = permute(productsInKineticLaw);
+            if (permutedReactants.length === 0) {
+                permutedReactants.push([]);
+            }
+            if (permutedProducts.length === 0) {
+                permutedProducts.push([]);
+            }
+            console.log(permutedReactants)
+            console.log(permutedProducts)
+            const ret = [];
+            permutedReactants.forEach(reactantPerm => {
+                permutedProducts.forEach(productPerm => {
+                    const symbolPattern = /[^\w_]/g;
+                    const symbols = kineticsSim.split(symbolPattern);
+                    
+                    const replacedSymbols = symbols.map(symbol => {
+                        if (reactantPerm.includes(symbol)) {
+                            var index = reactantPerm.indexOf(symbol) + 1;
+                            return 'reactant' + index;
+                        } else if (productPerm.includes(symbol)) {
+                            var index = productPerm.indexOf(symbol) + 1;
+                            return 'product' + index;
+                        } else if (enzymeList.includes(symbol)) {
+                            return 'enzyme';
+                        } else if (compartmentInKineticLaw.includes(symbol)) {
+                            return 'compartment';
+                        } else if (parametersInKineticLawOnly.includes(symbol)) {
+                            return 'parameter';
+                        } else {
+                            return symbol;
+                        }
+                    });
+                
+                    const nonAlphanumericChars = kineticsSim.match(symbolPattern) || [];
+                    let replacedString = '';
+                    
+                    replacedSymbols.forEach((symbol, index) => {
+                        replacedString += symbol + (nonAlphanumericChars[index] || '');
+                    });
+                    ret.push(replacedString);
+                });
+            });
+            
+            return ret;
+        }
+        const reactantsInKineticLaw = [];
+        const productsInKineticLaw = [];
+        console.log(speciesInKineticLaw)
+        console.log(productList)
+        speciesInKineticLaw.forEach(species => {
+            if (reactantList.includes(species)) {
+                reactantsInKineticLaw.push(species);
+            } else if (productList.includes(species)) {
+                productsInKineticLaw.push(species);
+            }
+        });
+        const ret = [];
+        const enzymeList = speciesInKineticLaw.filter(element => 
+            !reactantList.includes(element) && !productList.includes(element)
+        );
+        const replacedKineticsList = replaceOccurrences(reactantsInKineticLaw, productsInKineticLaw, enzymeList, compartmentInKineticLaw, parametersInKineticLawOnly, kineticsSim);
+        console.log(replacedKineticsList)
+        this.customClassificationList.forEach(item => {
+            const kineticsExpression = item.expression.replaceAll("^", "**");;
+            const optionalSymbols = item.optional_symbols;
+            const powerLimitedSpecies = item.power_limited_species;
+
+            var classifiedTrue = false;
+            for (let i = 0; i < replacedKineticsList.length; i++) {
+                const replacedKinetics = replacedKineticsList[i];
+                // Replace symbol names with their actual values in Python
+                let pythonCode = `
+def lower_powers(expr: sympy.Expr, keep=[]):
+    """
+    This function lowers the powers of a sympy expression to 1.
+    It does not lower the powers of symbols specified in the "keep" list,
+    and it only lowers positive integer powers.
+
+    Parameters:
+    expr (sympy.Expr): The sympy expression to transform.
+    keep (list of sympy.Symbol): A list of symbols whose powers should not be lowered.
+
+    Returns:
+    sympy.Expr: The transformed sympy expression.
+    """
+
+    # Function to replace each instance of Pow in the expression
+    def replace_if_applicable(base, exp):
+        # If the exponent is a positive integer and the base is a symbol
+        # not in the "keep" list, replace the Pow with the base
+        if exp.is_integer and exp > 1 and base.is_symbol and base not in keep:
+            return base
+        else:
+            # Otherwise, keep the Pow as it is
+            return sympy.Pow(base, exp)
+
+    # Use the replace method to apply the function to each Pow in the expression
+    return expr.replace(sympy.Pow, replace_if_applicable)
+
+def get_all_expr(expr, optional_symbols):
+    """
+    This function generates all possible expressions by optionally including
+    each symbol in optional_symbols in the given expression.
+
+    Parameters:
+    expr (sympy.Expr): The sympy expression to transform.
+    optional_symbols (list of sympy.Symbol): A list of symbols that can be optionally included.
+
+    Returns:
+    list of sympy.Expr: A list of all possible sympy expressions.
+    """
+    # Generate all possible combinations of the optional_symbols
+    all_combinations = list(chain(*map(lambda x: combinations(optional_symbols, x), range(0, len(optional_symbols)+1))))
+
+    all_expr = []
+    for combo in all_combinations:
+        # Copy the expression
+        temp_expr = expr
+        # Replace all non-included symbols with 1
+        for sym in optional_symbols:
+            if sym not in combo:
+                temp_expr = temp_expr.subs(sym, 1)
+        all_expr.append(sympy.simplify(temp_expr))
+
+    return all_expr
+reactant1, reactant2, reactant3, product1, product2, product3, enzyme, compartment, parameter = sympy.symbols('reactant1 reactant2 reactant3 product1 product2 product3 enzyme compartment parameter')
+kineticsExpression = ${kineticsExpression}
+all_expr = get_all_expr(kineticsExpression, [${optionalSymbols.toString()}])
+js.allExpr = str(all_expr)
+lowered_rate = lower_powers(${replacedKinetics}, [${powerLimitedSpecies.toString()}])
+js.comparisonResult = any(expr == sympy.simplify(lowered_rate) for expr in all_expr)
+                `;
+                
+                console.log(`comparing ${replacedKinetics} with ${kineticsExpression}`)
+        
+                // Run Python code in Pyodide
+                this.pyodide.runPython(pythonCode);
+                console.log(allExpr)
+                if (comparisonResult) {
+                    ret.push({
+                        name: item.name,
+                        comparisonResult: true
+                    });
+                    classifiedTrue = true;
+                    break;
+                }
+            };
+            if (!classifiedTrue) {
+                ret.push({
+                    name: item.name,
+                    comparisonResult: false
+                });
+            }
+        });
+        return ret;
+    }    
 
     kineticLawAnalysis(speciesInKineticLaw, parametersInKineticLawOnly, compartmentInKineticLaw, othersInKineticLaw, idsList, kinetics, kineticsSim, reactantList, productList) {
         this.assignPythonVals();
@@ -248,7 +439,7 @@ class KineticLaw {
         reactantList.forEach(reactant => {
             this._assignOtherSpeciesVals(reactant, speciesInKineticLaw, 1);
             prev = -Math.Infinity;
-            for (var i = -1; i <= 1; i += 0.1) {
+            for (var i = -0.9; i <= 0.9; i += 0.1) {
                 this.pyodide.runPython(`
                     ${reactant} = ${Math.pow(10, i)}
                     js.curr = ${kinetics}
@@ -263,9 +454,10 @@ class KineticLaw {
         });
         if (this.libsbmlReaction.getReversible()) {
             productList.forEach(product => {
+                prev = Math.Infinity;
                 if (speciesInKineticLaw.includes(product)) {
                     this._assignOtherSpeciesVals(product, speciesInKineticLaw, 1);
-                    for (var i = -1; i <= 1; i += 0.1) {
+                    for (var i = -0.9; i <= 0.9; i += 0.1) {
                         this.pyodide.runPython(`
                             ${product} = ${Math.pow(10, i)}
                             js.curr = ${kinetics}
@@ -539,7 +731,7 @@ class KineticLaw {
         var productOfTerms = kinetics.split(/[+-]/);
         var ret = 0;
         productOfTerms.forEach(term => {
-            var format = this._checkProductOfTermsFormat(kinetics, compartmentInKineticLaw, parametersInKineticLawOnly, this.reaction.sortedSpeciesList);
+            var format = this._checkProductOfTermsFormat(term, compartmentInKineticLaw, parametersInKineticLawOnly, this.reaction.sortedSpeciesList);
             if (format > ret) {
                 ret = format;
             }
@@ -1378,6 +1570,7 @@ class KineticLaw {
      * @return {boolean}
      */
     _isPolynomial(kineticsSim, idsList) {
+        if (typeof(kineticsSim))
         var preSymbols = '';
         var i;
         if (idsList.length > 0) {

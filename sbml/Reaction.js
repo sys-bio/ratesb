@@ -1,6 +1,6 @@
 /** Abstraction for a Reaction */
 class Reaction {
-    constructor( libsbmlModel, libsbmlReaction, functionDefinitions, pyodide, processSBML, checks ) {
+    constructor( libsbmlModel, libsbmlReaction, functionDefinitions, pyodide, processSBML, checks, customClassificationList ) {
         this.reaction = libsbmlReaction;
         console.log(this.reaction)
         this.boundarySpeciesList = [];
@@ -29,7 +29,7 @@ class Reaction {
         
         this.sortedSpeciesList = this.reactantList.concat(this.productList);
         this.id = this.reaction.getId();
-        this.kineticLaw = new KineticLaw(libsbmlModel, libsbmlReaction, this.reaction.getKineticLaw(), this, functionDefinitions, pyodide, processSBML, checks);
+        this.kineticLaw = new KineticLaw(libsbmlModel, libsbmlReaction, this.reaction.getKineticLaw(), this, functionDefinitions, pyodide, processSBML, checks, customClassificationList);
     }
 
     getId() {
@@ -64,15 +64,15 @@ class Reaction {
         }
         var ret = `${reactantStr} ${reactionArrow} ${productStr}; ${kineticStr}`;
         if (this.kineticLaw.analysis["emptyRateLaw"]) {
-            ret += E001;
+            ret += "\nError E001: No Rate Law entered";
         } else if (this.kineticLaw.analysis["pureNumber"]) {
-            ret += W001;
+            ret += "\nWarning W001: Rate law contains only number";
         } else {
             if (this.kineticLaw.analysis["floatingSpecies"].length > 0) {
                 ret += `\nError E002: Expecting reactant in rate law but not found: ${this.kineticLaw.analysis["floatingSpecies"].toString()}`;
             }
             if (this.kineticLaw.analysis["boundaryFloatingSpecies"].length > 0) {
-                ret += `\nWarning W016: Expecting boundary species reactant in rate law but not found: ${this.kineticLaw.analysis["boundaryFloatingSpecies"].toString()}`
+                ret += `\nWarning W005: Expecting boundary species reactant in rate law but not found: ${this.kineticLaw.analysis["boundaryFloatingSpecies"].toString()}`
             }
             if (!(
                 this.kineticLaw.classificationCp["zerothOrder"] ||
@@ -86,19 +86,31 @@ class Reaction {
                 this.kineticLaw.classificationCp["Hill"] ||
                 this.kineticLaw.classificationCp["Polynomial"]
             )) {
-                ret += "\nWarning W002: Unrecognized rate law from the standard list.";
+                if (this.kineticLaw.customClassification.length > 0) {
+                    var flag = true;
+                    this.kineticLaw.customClassification.forEach(item => {
+                        if (item.comparisonResult) {
+                            flag = false;
+                        }
+                    });
+                    if (flag) {
+                        ret += "\nWarning W002: Unrecognized rate law from the standard list and the custom list";
+                    }
+                } else {
+                    ret += "\nWarning W002: Unrecognized rate law from the standard list";
+                }
             }
             if (this.kineticLaw.analysis["inconsistentProducts"].length > 0) {
-                ret += `\nWarning W003: Irreversible reaction kinetic law contains products: ${this.kineticLaw.analysis["inconsistentProducts"].toString()}`;
+                ret += `\nWarning W010: Irreversible reaction kinetic law contains products: ${this.kineticLaw.analysis["inconsistentProducts"].toString()}`;
             }
             if (this.kineticLaw.analysis["nonIncreasingSpecies"][0].length > 0) {
-                ret += `\nWarning W004: Flux is not increasing as reactant increases: ${this.kineticLaw.analysis["nonIncreasingSpecies"][0].toString()}`;
+                ret += `\nWarning W003: Flux is not increasing as reactant increases: ${this.kineticLaw.analysis["nonIncreasingSpecies"][0].toString()}`;
             }
             if (this.kineticLaw.analysis["nonIncreasingSpecies"][1].length > 0) {
-                ret += `\nWarning W0015: Flux is not decreasing as product increases: ${this.kineticLaw.analysis["nonIncreasingSpecies"][1].toString()}`;
+                ret += `\nWarning W004: Flux is not decreasing as product increases: ${this.kineticLaw.analysis["nonIncreasingSpecies"][1].toString()}`;
             }
             if (this.kineticLaw.analysis["namingConvention"]['k'].length > 0) {
-                ret += `\nWarning W005: We recommend that these parameters start with 'k': ${this.kineticLaw.analysis["namingConvention"]['k'].toString()}`;
+                ret += `\nWarning W020: We recommend that these parameters start with 'k': ${this.kineticLaw.analysis["namingConvention"]['k'].toString()}`;
             }
             if (this.kineticLaw.analysis["namingConvention"]['K'].length > 0) {
                 ret += `\nWarning W006: We recommend that these parameters start with 'K': ${this.kineticLaw.analysis["namingConvention"]['K'].toString()}`;
@@ -111,54 +123,54 @@ class Reaction {
                     // Formatted correctly, no warning needed
                     break;
                 case 1:
-                    ret += "\nWarning W008: Elements of the same type are not ordered properly.";
+                    ret += "\nWarning W030: Elements of the same type are not ordered properly";
                     break;
                 case 2:
-                    ret += "\nWarning W009: Formatting convention not followed (compartment before parameters before species).";
+                    ret += "\nWarning W031: Formatting convention not followed (compartment before parameters before species)";
                     break;
                 case 3:
-                    ret += "\nWarning W010: Denominator not in alphabetical order.";
+                    ret += "\nWarning W032: Denominator not in alphabetical order";
                     break;
                 case 4:
-                    ret += "\nWarning W011: Numerator and denominator not in alphabetical order.";
+                    ret += "\nWarning W033: Numerator and denominator not in alphabetical order";
                     break;
                 case 5:
-                    ret += "\nWarning W012: Numerator convention not followed and denominator not in alphabetical order.";
+                    ret += "\nWarning W034: Numerator convention not followed and denominator not in alphabetical order";
                     break;
                 case 6:
-                    ret += "\nWarning W013: Denominator convention not followed.";
+                    ret += "\nWarning W035: Denominator convention not followed";
                     break;
                 case 7:
-                    ret += "\nWarning W014: Numerator not in alphabetical order and denominator convention not followed.";
+                    ret += "\nWarning W036: Numerator not in alphabetical order and denominator convention not followed";
                     break;
                 case 8:
-                    ret += "\nWarning W015: Numerator and denominator convention not followed.";
+                    ret += "\nWarning W037: Numerator and denominator convention not followed";
                     break;
                 default:
                     // Unhandled case, add an appropriate message if needed
                     break;
             }
             if (this.kineticLaw.analysis["nonConstParams"].length > 0) {
-                ret += `\nWarning W017: Expecting these parameters to be constants: ${this.kineticLaw.analysis["nonConstParams"].toString()}`
+                ret += `\nWarning W006: Expecting these parameters to be constants: ${this.kineticLaw.analysis["nonConstParams"].toString()}`
             }
             switch (this.kineticLaw.analysis["annotation"]) {
                 case 0:
                     // Formatted correctly, no warning needed
                     break;
                 case 1:
-                    ret += "\nWarning W018: Uni-directional mass action annotation not following recommended SBO terms, we recommend annotations to be subclasses of: SBO_0000430, SBO_0000041.";
+                    ret += "\nWarning W040: Uni-directional mass action annotation not following recommended SBO terms, we recommend annotations to be subclasses of: SBO_0000430, SBO_0000041";
                     break;
                 case 2:
-                    ret += "\nWarning W019: Uni-term with the moderator annotation not following recommended SBO terms, we recommend annotations to be subclasses of: SBO_0000041.";
+                    ret += "\nWarning W041: Uni-term with the moderator annotation not following recommended SBO terms, we recommend annotations to be subclasses of: SBO_0000041";
                     break;
                 case 3:
-                    ret += "\nWarning W020: Bi-directional mass action or Bi-terms with the moderator annotation not following recommended SBO terms, we recommend annotations to be subclasses of: SBO_0000042.";
+                    ret += "\nWarning W042: Bi-directional mass action or Bi-terms with the moderator annotation not following recommended SBO terms, we recommend annotations to be subclasses of: SBO_0000042";
                     break;
                 case 4:
-                    ret += "\nWarning W021: Michaelis-Menten kinetics without an explicit enzyme annotation not following recommended SBO terms, we recommend annotations to be subclasses of: SBO_0000028.";
+                    ret += "\nWarning W043: Michaelis-Menten kinetics without an explicit enzyme annotation not following recommended SBO terms, we recommend annotations to be subclasses of: SBO_0000028";
                     break;
                 case 5:
-                    ret += "\nWarning W022: Michaelis-Menten kinetics with an explicit enzyme annotation not following recommended SBO terms, we recommend annotations to be subclasses of: SBO_0000028, SBO_0000430.";
+                    ret += "\nWarning W044: Michaelis-Menten kinetics with an explicit enzyme annotation not following recommended SBO terms, we recommend annotations to be subclasses of: SBO_0000028, SBO_0000430";
                     break;
                 default:
                     // Unhandled case, add an appropriate message if needed
