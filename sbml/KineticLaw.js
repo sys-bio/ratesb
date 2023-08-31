@@ -277,14 +277,48 @@ def get_all_expr(expr, optional_symbols):
             if sym not in combo:
                 temp_expr = temp_expr.subs(sym, 1)
         all_expr.append(sympy.simplify(temp_expr))
-
     return all_expr
+
+def check_equal(expr1, expr2, n=20, sample_min=1, sample_max=10):
+    """check if two sympy expressions are equal by plugging random numbers
+    into each symbols in both expressions and test if they are equal
+
+    Args:
+        Expr1 (sympy.Expr): first sympy expression to compare
+        Expr2 (sympy.Expr): second sympy expression to compare
+        n (int, optional): number of test to perform. Defaults to 20.
+        sample_min (int, optional): the minimum of random number. Defaults to 1.
+        sample_max (int, optional): the maximum of random number. Defaults to 10.
+    
+    Returns:
+        bool: if the two expressions are equal
+    """
+    # Regroup all free symbols from both expressions
+    free_symbols = set(expr1.free_symbols) | set(expr2.free_symbols)
+    
+    # Numeric (brute force) equality testing n-times
+    for i in range(n):
+        your_values=numpy.random.uniform(sample_min, sample_max, len(free_symbols))
+        expr1_num=expr1
+        expr2_num=expr2
+        for symbol,number in zip(free_symbols, your_values):
+            expr1_num=expr1_num.subs(symbol, sympy.Float(number))
+            expr2_num=expr2_num.subs(symbol, sympy.Float(number))
+        expr1_num=float(expr1_num)
+        expr2_num=float(expr2_num)
+        if not numpy.allclose(expr1_num, expr2_num):
+            return False
+    return True
+
 reactant1, reactant2, reactant3, product1, product2, product3, enzyme, compartment, parameter = sympy.symbols('reactant1 reactant2 reactant3 product1 product2 product3 enzyme compartment parameter')
 kineticsExpression = ${kineticsExpression}
 all_expr = get_all_expr(kineticsExpression, [${optionalSymbols.toString()}])
 js.allExpr = str(all_expr)
 lowered_rate = lower_powers(${replacedKinetics}, [${powerLimitedSpecies.toString()}])
-js.comparisonResult = any(expr == sympy.simplify(lowered_rate) for expr in all_expr)
+simplified_rate = sympy.simplify(lowered_rate)
+approx_comparison_result = any(check_equal(expr, simplified_rate) for expr in all_expr)
+equal_comparison_result = any(expr == simplified_rate for expr in all_expr)
+js.comparisonResult = equal_comparison_result or approx_comparison_result
                 `;
                 
                 console.log(`comparing ${replacedKinetics} with ${kineticsExpression}`)

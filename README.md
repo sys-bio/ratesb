@@ -1,6 +1,6 @@
 # ratesb: Rate Law Analysis for SBML and Antimony Models
 
-Welcome to the web version of `ratesb`, a robust platform designed to analyze rate laws in SBML and Antimony models straight from your browser! This repository houses the web application's codebase, which offers the same core functionality as the `ratesb_python` package. (package will be released soon)
+Welcome to the web version of `ratesb`, a robust platform designed to analyze rate laws in SBML and Antimony models straight from your browser! This repository houses the web application's codebase, which offers the same core functionality as the `ratesb-python` package. (package will be released soon) The url to access this web application is https://sys-bio.github.io/ratesb/
 
 ## Features
 
@@ -81,10 +81,16 @@ We're always open to contributions! Whether it's bug reports, feature requests, 
 
 ## Future Improvements
 
-We aim to continuously refine the performance of classifying Michaelis-Menten rate laws by evolving the underlying algorithm.
+- We aim to continuously refine the performance of classifying Michaelis-Menten rate laws by evolving the underlying algorithm.
+- ratesb-python is a python library being developed, and after it's released, it will be used in the website.
 
 ## Contact
 
 For further inquiries or feedback, reach out to:
 
-Longxuan Fan: longxuan@usc.edu
+Primary contact:
+- Longxuan Fan: longxuan@usc.edu
+
+Secondary contact:
+- Joseph Hellerstein: joseph.hellerstein@gmail.com
+- Herbert Sauro: hsauro@uw.edu

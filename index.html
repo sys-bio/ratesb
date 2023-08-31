@@ -65,12 +65,15 @@
 
         const micropip = pyodide.pyimport("micropip");
         await micropip.install('sympy');
-        loadingStatus.textContent = "sympy installed! Running Python code...";
+        loadingStatus.textContent = "sympy installed! Installing numpy...";
+        await micropip.install('numpy');
+        loadingStatus.textContent = "numpy installed! Running Python code...";
 
         // await micropip.install('SBMLKinetics')
         pyodide.runPython(`
           import js
           import sympy
+          import numpy
           from itertools import chain, combinations
         `);
         loadingStatus.textContent = "Python code run successfully! All packages loaded";
@@ -84,19 +87,20 @@
       var rateLawsData = [
           {
               "name": "Unidirectional Mass Action",
-              "expression": "compartment * parameter * reactant",
+              "expression": "compartment * parameter * reactant1",
               "optional_symbols": ["compartment", "parameter"],
-              "power_limited_species": ["reactant"]
+              "power_limited_species": ["reactant1"]
           },
           {
-              "name": "Michaelis Menten",
-              "expression": "compartment * parameter * reactant / (reactant + parameter)",
+              "name": "Michaelis-Menten",
+              "expression": "compartment * parameter * reactant1 / (reactant1 + parameter)",
               "optional_symbols": ["compartment"],
-              "power_limited_species": ["reactant"]
+              "power_limited_species": ["reactant1"]
           },
           {
+              "ignore": true,
               "name": "Your own rate law",
-              "expression": "use: compartment, parameter, reactant, product, enzyme. Do NOT use: species",
+              "expression": "use: compartment, parameter, reactant1, reactant2, reactant3, product1, product2, product3, enzyme. Do NOT use: species",
               "optional_symbols": ["symbols that do not have to include in a rate law"],
               "power_limited_species": ["symbols that have to be set to a certain power in a rate law (please specify power in the expression)"]
           }
@@ -262,9 +266,9 @@
     var input = document.getElementById('json_file');
     if(input.files.length > 0) {
         var fileName = input.files[0].name;
-        document.getElementById('json-drop-zone').innerText = 'File chosen: ' + fileName;
+        document.getElementById('json_file').innerText = 'File chosen: ' + fileName;
     } else {
-        document.getElementById('json-drop-zone').innerText = 'Drop or choose custom classification file (.json)';
+        document.getElementById('json_file').innerText = 'Drop or choose custom classification file (.json)';
     }
     const file = input.files[0];
 
@@ -291,6 +295,8 @@
                   warnings.push(`Item at index ${index} does not follow the correct structure, skipping.`);
                 }
                 return false;
+            } else if (item.hasOwnProperty("ignore") && typeof item.ignore === 'boolean' && item.ignore) {
+              return false;
             } else {
               let replacedExpression = item.expression.replace(/(compartment|parameter|reactant1|reactant2|reactant3|product1|product2|product3|enzyme|\*\*|\^)/g, function(match) {
                 if (match === "**") {
@@ -637,7 +643,6 @@
     <p class="text-center">Accepts SBML and Antimony files, or paste Antimony model in the text box.
       <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#infoModal">Info</button>
       <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#errorCodesModal">View Error Codes</button>
-      <button type="button" class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#customClassificationModal">Custom Classification Info</button>
     </p>
 
     <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
@@ -727,7 +732,7 @@
             <h3>1. Define the Rate Law's Name</h3>
             <p>Provide a unique and descriptive name for your custom rate law.</p>
             <pre><code>{
-    "name": "Name of the Rate Law"
+    "name": "Michaelis-Menten"
 }
             </code></pre>
 
@@ -742,31 +747,33 @@
             </ul>
             <p>Note: Do NOT use the term "species" in your expression.</p>
             <pre><code>{
-    "expression": "Your Mathematical Expression Here"
+    "expression": "compartment * parameter * reactant1 / (reactant1 + parameter)"
 }
             </code></pre>
 
             <h3>3. Define Optional Symbols</h3>
             <p>These are symbols that don't have to be included in the rate law. List them in the format shown below:</p>
             <pre><code>{
-    "optional_symbols": ["Your Optional Symbols Here"]
+    "optional_symbols": ["compartment"]
 }
             </code></pre>
+            <p>In this case a rate law following the expression with or without compartment will be classified as Michaelis-Menten.</p>
 
             <h3>4. Power Limited Species</h3>
             <p>Specify which species have a power that needs to be considered. If the power of a certain species matters for the rate law, mention it in the expression. Add them to the list as shown:</p>
             <pre><code>{
-    "power_limited_species": ["Your Power Limited Species Here"]
+    "power_limited_species": ["reactant1"]
 }
             </code></pre>
+            <p>In this case the power of reactant1 has to be 1, while other symbols can have any positive integer power. There can be multiple parameter, for example <pre><code>k1 * k2 * S1 / (S1 + k3)</code></pre> where k1, k2, k3 are parameters and S1 is the reactant is classified as Michaelis-Menten according to the expression above.</p>
 
             <h3>Final Structure</h3>
             <p>Your custom rate law should look like this:</p>
             <pre><code>{
-    "name": "Name of the Rate Law",
-    "expression": "Your Mathematical Expression Here",
-    "optional_symbols": ["Your Optional Symbols Here"],
-    "power_limited_species": ["Your Power Limited Species Here"]
+    "name": "Michaelis-Menten",
+    "expression": "compartment * parameter * reactant1 / (reactant1 + parameter)",
+    "optional_symbols": ["compartment"],
+    "power_limited_species": ["reactant1"]
 }
             </code></pre>
 
@@ -794,7 +801,7 @@
         </div>
       
         <div class="mb-3">
-          <div id="bioModelInput" class="form-control" contenteditable="true" style="min-height:100px; overflow:auto; white-space: pre-wrap;"></div>
+          <div id="bioModelInput" class="form-control" contenteditable="true" style="min-height:150px; overflow:auto; white-space: pre-wrap;"></div>
         </div>
 
         <div style="display: flex; align-items: center; margin-top: -15px; margin-bottom: 10px;">
@@ -806,20 +813,6 @@
           <button id="ClickMe" class="btn btn-primary" data-bs-toggle="tooltip" data-bs-placement="right" onclick="processTextInput()" title="Click to analyze the model in the text box">Analyze Model</button>
           <button id="copyInputToClipboard" class="btn btn-secondary" onclick="copyInputToClipboard()">Copy to Clipboard</button>
           <span id="copy-input-tooltip" style="visibility: hidden; opacity: 0; transition: visibility 0s, opacity 0.5s linear;">Copied to clipboard!</span>
-        </div>
-
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div style="width: 80%;">
-              <input type="file" id="json_file" accept=".json" onchange="loadJsonFile()" style="display: none;">
-              <label for="json_file" style="width: 100%;">
-                  <div id="json-drop-zone" ondragover="handleJsonDragOver(event)" ondrop="handleJsonFileDrop(event)" style="border: 2px dashed #999; padding: 20px; text-align: center; cursor: pointer; width: 100%; overflow: auto;">
-                      Drop or choose custom classification file (.json)
-                  </div>
-              </label>
-          </div>
-          <button type="button" id="download-button" class="btn btn-primary" data-bs-toggle="tooltip" onclick="downloadJson()" title="Download and customize rate laws" style="margin-left: 20px; width: 18%;">
-              Download
-          </button>
         </div>
       
 
@@ -851,6 +844,41 @@
             </div>
           </div>
         </div>
+
+        <div id="custom-rate-law-container">
+          <div id="custom-rate-law" class="basic-error-check" style="cursor: pointer;" onclick="toggleDropdown('custom-rate-law-list')">
+            <i id="custom-rate-law-icon" class="fas fa-chevron-right"></i>
+            <span>&nbsp;Custom Rate Law Classification</span>
+          </div>
+          <div id="custom-rate-law-list" style="display: none; margin-left: 2em;">
+              <div class="custom-rate-law-item" style="display: flex; align-items: center;">
+                  <input type="file" id="json_file" accept=".json" onchange="loadJsonFile()" style="display: none;">
+                  <button onclick="document.getElementById('json_file').click();" ondragover="handleJsonDragOver(event)" ondrop="handleJsonFileDrop(event)" style="margin-right: 10px;">Choose File</button>
+                  <span id="uploadedFileName" style="flex-grow: 1; margin-right: 10px;"></span>
+                  <button onclick="downloadJson()" style="margin-right: 10px;" title="Download default json for rate laws">Download Sample</button>
+                  <button data-bs-toggle="modal" data-bs-target="#customClassificationModal" style="margin-right: 10px;">Info</button>
+              </div>
+          </div>
+      </div>
+      
+      <!-- Modal for Info Button -->
+      <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
+          <div class="modal-dialog modal-lg">
+              <div class="modal-content">
+                  <div class="modal-header">
+                      <h2 class="modal-title" id="infoModalLabel">Create Your Own Custom Rate Law</h2>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body">
+                      <!-- Add the content of the info button here -->
+                      <!-- ... -->
+                  </div>
+                  <div class="modal-footer">
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                  </div>
+              </div>
+          </div>
+      </div>
 
         <div class="basic-error-check-item">
           <div style="flex: 1;">
@@ -896,6 +924,21 @@
   $(function () {
     $('[data-bs-toggle="tooltip"]').tooltip()
   })
+  function displayFileName() {
+    let inputElem = document.getElementById('json_file');
+    if(inputElem.value) {
+        document.getElementById('uploadedFileName').textContent = inputElem.files[0].name;
+    }
+  }
+
+  function toggleDropdown(id) {
+    const dropdownContent = document.getElementById(id);
+    if (dropdownContent.style.display === 'none' || dropdownContent.style.display === '') {
+        dropdownContent.style.display = 'block';
+    } else {
+        dropdownContent.style.display = 'none';
+    }
+}
 </script>
 </body>
 </html>
